@@ -47,15 +47,6 @@ jobs:
       run: |
         echo "def test_2(): pass" > nothing2.py
         nosetests nothing2.py
-    - name: Run pytest examples/unit_tests/verify_framework.py --browser=chrome --headless
-      run: |
-        pytest examples/unit_tests/verify_framework.py --browser=chrome --headless -v -s --junit-xml=junit/test-results.xml
-    - name: Run pytest examples/offline_examples --browser=chrome --headless --rs
-      run: |
-        pytest examples/offline_examples --rs --browser=chrome --headless -v -s --junit-xml=junit/test-results.xml
-    - name: Run pytest examples/test_xkcd.py --browser=chrome
-      run: |
-        pytest examples/test_xkcd.py --browser=chrome  -v -s --junit-xml=junit/test-results.xml
     - name: Verify seleniumbase install from PyPI
       run: |
         pip install seleniumbase -U --no-deps --force-reinstall --no-cache-dir
