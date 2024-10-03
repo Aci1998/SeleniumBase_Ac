@@ -1,3 +1,4 @@
+import time
 from seleniumbase import BaseCase
 BaseCase.main(__name__, __file__)
 
@@ -14,3 +15,17 @@ class MyTestClass(BaseCase):
         self.assert_exact_text("xkcd.com", "h2")
         self.click_link("comic #249")
         self.assert_element('img[alt*="Chess"]')
+
+
+    def test_feituyun_qiandao(self):
+        self.open("https://www.xn--h5qy75o.com/")
+
+        self.type("//*[@id='regusername']", "imacaiy@outlook.com")
+        self.type("//*[@id='regpassword']", "test123456")
+
+        self.click("//*[@id='loginbox']/button")
+        time.sleep(5)
+
+        self.click("//*[@id='tangonggao']/div/button")
+        self.click("/html/body/div[1]/div/div[3]/a[contains(text(),'签到得流量')]")
+
