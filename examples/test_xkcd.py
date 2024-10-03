@@ -29,3 +29,8 @@ class MyTestClass(BaseCase):
         self.click("//*[@id='tangonggao']/div/button")
         self.click("/html/body/div[1]/div/div[3]/a[contains(text(),'签到得流量')]")
 
+        time.sleep(5)
+        self.click("/html/body/div[3]/div/div[2]/div[1]/div/button[contains(text(),'立即签到')]")
+
+
+
