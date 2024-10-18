@@ -545,12 +545,12 @@ def get_configured_sb(context):
         if low_key in ["disable-js", "disable_js"]:
             sb.disable_js = True
             continue
-        # Handle: -D disable-csp / disable_csp
-        if low_key in ["disable-csp", "disable_csp"]:
+        # Handle: -D disable-csp / disable_csp / dcsp
+        if low_key in ["disable-csp", "disable_csp", "dcsp"]:
             sb.disable_csp = True
             continue
-        # Handle: -D disable-ws / disable_ws
-        if low_key in ["disable-ws", "disable_ws"]:
+        # Handle: -D disable-ws / disable_ws / dws
+        if low_key in ["disable-ws", "disable_ws", "dws"]:
             sb.disable_ws = True
             continue
         # Handle: -D enable-ws / enable_ws
@@ -1231,10 +1231,6 @@ def behave_dashboard_prepare():
         c1 = ""
         cr = ""
         if not is_linux:
-            if is_windows and hasattr(colorama, "just_fix_windows_console"):
-                colorama.just_fix_windows_console()
-            else:
-                colorama.init(autoreset=True)
             c1 = colorama.Fore.BLUE + colorama.Back.LIGHTCYAN_EX
             cr = colorama.Style.RESET_ALL
         print("Dashboard: %s%s%s\n%s" % (c1, dash_path, cr, stars))
@@ -1346,10 +1342,6 @@ def _perform_behave_terminal_summary_():
     c2 = ""
     cr = ""
     if not is_linux:
-        if is_windows and hasattr(colorama, "just_fix_windows_console"):
-            colorama.just_fix_windows_console()
-        else:
-            colorama.init(autoreset=True)
         c2 = colorama.Fore.MAGENTA + colorama.Back.LIGHTYELLOW_EX
         cr = colorama.Style.RESET_ALL
     if sb_config.dashboard:

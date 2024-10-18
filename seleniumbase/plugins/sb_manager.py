@@ -249,6 +249,7 @@ def SB(
     interval (float):  SECONDS (Autoplay interval for SB Slides & Tour steps.)
     time_limit (float):  SECONDS (Safely fail tests that exceed the time limit)
     """
+    import colorama
     import os
     import sys
     import time
@@ -261,7 +262,6 @@ def SB(
 
     sb_config_backup = sb_config
     sb_config._do_sb_post_mortem = False
-    is_windows = shared_utils.is_windows()
     sys_argv = sys.argv
     arg_join = " ".join(sys_argv)
     archive_logs = False
@@ -711,8 +711,25 @@ def SB(
     else:
         variables = {}
     if disable_csp is None:
-        disable_csp = False
+        if (
+            "--disable-csp" in sys_argv
+            or "--no-csp" in sys_argv
+            or "--dcsp" in sys_argv
+        ):
+            disable_csp = True
+        else:
+            disable_csp = False
     if (
+        (enable_ws is None and disable_ws is None)
+        and (
+            "--disable-web-security" in sys_argv
+            or "--disable-ws" in sys_argv
+            or "--dws" in sys_argv
+        )
+    ):
+        enable_ws = False
+        disable_ws = True
+    elif (
         (enable_ws is None and disable_ws is None)
         or (disable_ws is not None and not disable_ws)
         or (enable_ws is not None and enable_ws)
@@ -1152,11 +1169,6 @@ def SB(
     test_name = None
     terminal_width = shared_utils.get_terminal_width()
     if test:
-        import colorama
-        if is_windows and hasattr(colorama, "just_fix_windows_console"):
-            colorama.just_fix_windows_console()
-        else:
-            colorama.init(autoreset=True)
         c1 = colorama.Fore.GREEN
         b1 = colorama.Style.BRIGHT
         cr = colorama.Style.RESET_ALL

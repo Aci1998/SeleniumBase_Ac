@@ -1,27 +1,34 @@
 import collections
 import os
 import pdb
-try:
-    import pdbp  # (Pdb+) --- Python Debugger Plus
-except Exception:
-    pass
 import sys
+from contextlib import suppress
 from selenium import webdriver
 from seleniumbase.__version__ import __version__
 from seleniumbase.common import decorators  # noqa
 from seleniumbase.common import encryption  # noqa
-from seleniumbase.core import colored_traceback  # noqa
+from seleniumbase.core import colored_traceback
 from seleniumbase.core.browser_launcher import get_driver  # noqa
 from seleniumbase.fixtures import js_utils  # noqa
 from seleniumbase.fixtures import page_actions  # noqa
 from seleniumbase.fixtures import page_utils  # noqa
-from seleniumbase.fixtures import shared_utils  # noqa
+from seleniumbase.fixtures import shared_utils
 from seleniumbase.fixtures.base_case import BaseCase  # noqa
 from seleniumbase.masterqa.master_qa import MasterQA  # noqa
 from seleniumbase.plugins.sb_manager import SB  # noqa
 from seleniumbase.plugins.driver_manager import Driver  # noqa
 from seleniumbase.plugins.driver_manager import DriverContext  # noqa
 from seleniumbase import translate  # noqa
+
+with suppress(Exception):
+    import colorama
+
+with suppress(Exception):
+    import pdbp  # (Pdb+) --- Python Debugger Plus
+
+with suppress(Exception):
+    shared_utils.fix_colorama_if_windows()
+    colorama.init(autoreset=True)
 
 if sys.version_info[0] < 3 and "pdbp" in locals():
     # With Python3, "import pdbp" is all you need
