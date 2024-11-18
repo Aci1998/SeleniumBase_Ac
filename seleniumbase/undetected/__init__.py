@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import logging
 import os
 import re
@@ -133,8 +132,11 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             options = ChromeOptions()
         try:
             if hasattr(options, "_session") and options._session is not None:
-                # Prevent reuse of options
-                raise RuntimeError("You cannot reuse the ChromeOptions object")
+                # Prevent reuse of options.
+                # (Probably a port overlap. Quit existing driver and continue.)
+                logger.debug("You cannot reuse the ChromeOptions object")
+                with suppress(Exception):
+                    options._session.quit()
         except AttributeError:
             pass
         options._session = self
@@ -233,6 +235,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                     "--no-first-run",
                     "--no-service-autorun",
                     "--password-store=basic",
+                    "--profile-directory=Default",
                 ]
             )
         options.add_argument(
@@ -421,7 +424,9 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         - Recreates the session."""
         if hasattr(self, "service"):
             with suppress(Exception):
-                self.service.stop()
+                if self.service.is_connectable():
+                    self.stop_client()
+                    self.service.stop()
             if isinstance(timeout, str):
                 if timeout.lower() == "breakpoint":
                     breakpoint()  # To continue:
@@ -430,18 +435,27 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                 time.sleep(timeout)
             with suppress(Exception):
                 self.service.start()
-            time.sleep(0.012)
         with suppress(Exception):
             self.start_session()
-        time.sleep(0.012)
+        with suppress(Exception):
+            if self.current_url.startswith("chrome-extension://"):
+                self.close()
+                if self.service.is_connectable():
+                    self.stop_client()
+                    self.service.stop()
+                self.service.start()
+                self.start_session()
+        self._is_connected = True
 
     def disconnect(self):
         """Stops the chromedriver service that runs in the background.
         To use driver methods again, you MUST call driver.connect()"""
         if hasattr(self, "service"):
             with suppress(Exception):
-                self.service.stop()
-            time.sleep(0.012)
+                if self.service.is_connectable():
+                    self.stop_client()
+                    self.service.stop()
+            self._is_connected = False
 
     def connect(self):
         """Starts the chromedriver service that runs in the background
@@ -449,10 +463,17 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         if hasattr(self, "service"):
             with suppress(Exception):
                 self.service.start()
-            time.sleep(0.012)
         with suppress(Exception):
             self.start_session()
-        time.sleep(0.012)
+        with suppress(Exception):
+            if self.current_url.startswith("chrome-extension://"):
+                self.close()
+                if self.service.is_connectable():
+                    self.stop_client()
+                    self.service.stop()
+                self.service.start()
+                self.start_session()
+        self._is_connected = True
 
     def start_session(self, capabilities=None):
         if not capabilities:
@@ -476,7 +497,9 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             pass
         if hasattr(self, "service") and getattr(self.service, "process", None):
             logger.debug("Stopping webdriver service")
-            self.service.stop()
+            with suppress(Exception):
+                self.stop_client()
+                self.service.stop()
         with suppress(Exception):
             if self.reactor and isinstance(self.reactor, Reactor):
                 logger.debug("Shutting down Reactor")

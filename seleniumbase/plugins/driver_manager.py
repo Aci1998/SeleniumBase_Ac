@@ -124,10 +124,13 @@ def Driver(
     d_width=None,  # Set device width
     d_height=None,  # Set device height
     d_p_r=None,  # Set device pixel ratio
+    position=None,  # Shortcut / Duplicate of "window_position".
+    size=None,  # Shortcut / Duplicate of "window_size".
     uc=None,  # Shortcut / Duplicate of "undetectable".
     undetected=None,  # Shortcut / Duplicate of "undetectable".
     uc_cdp=None,  # Shortcut / Duplicate of "uc_cdp_events".
     uc_sub=None,  # Shortcut / Duplicate of "uc_subprocess".
+    locale=None,  # Shortcut / Duplicate of "locale_code".
     log_cdp=None,  # Shortcut / Duplicate of "log_cdp_events".
     ad_block=None,  # Shortcut / Duplicate of "ad_block_on".
     server=None,  # Shortcut / Duplicate of "servername".
@@ -216,10 +219,13 @@ def Driver(
     d_width (int):  Set device width
     d_height (int):  Set device height
     d_p_r (float):  Set device pixel ratio
+    position (x,y):  Shortcut / Duplicate of "window_position".
+    size (w,h):  Shortcut / Duplicate of "window_size".
     uc (bool):  Shortcut / Duplicate of "undetectable".
     undetected (bool):  Shortcut / Duplicate of "undetectable".
     uc_cdp (bool):  Shortcut / Duplicate of "uc_cdp_events".
     uc_sub (bool):  Shortcut / Duplicate of "uc_subprocess".
+    locale (str):  Shortcut / Duplicate of "locale_code".
     log_cdp (bool):  Shortcut / Duplicate of "log_cdp_events".
     ad_block (bool):  Shortcut / Duplicate of "ad_block_on".
     server (str):  Shortcut / Duplicate of "servername".
@@ -229,6 +235,7 @@ def Driver(
     """
     from seleniumbase import config as sb_config
     from seleniumbase.config import settings
+    from seleniumbase.core import browser_launcher
     from seleniumbase.fixtures import constants
     from seleniumbase.fixtures import shared_utils
 
@@ -433,6 +440,8 @@ def Driver(
                 break
             count += 1
     disable_features = d_f
+    if window_position is None and position is not None:
+        window_position = position
     w_p = window_position
     if w_p is None and "--window-position" in arg_join:
         count = 0
@@ -446,29 +455,31 @@ def Driver(
                     w_p = None
                 break
             count += 1
-        window_position = w_p
-        if window_position:
-            if window_position.count(",") != 1:
-                message = (
-                    '\n\n  window_position expects an "x,y" string!'
-                    '\n  (Your input was: "%s")\n' % window_position
-                )
-                raise Exception(message)
-            window_position = window_position.replace(" ", "")
-            win_x = None
-            win_y = None
-            try:
-                win_x = int(window_position.split(",")[0])
-                win_y = int(window_position.split(",")[1])
-            except Exception:
-                message = (
-                    '\n\n  Expecting integer values for "x,y"!'
-                    '\n  (window_position input was: "%s")\n'
-                    % window_position
-                )
-                raise Exception(message)
-            settings.WINDOW_START_X = win_x
-            settings.WINDOW_START_Y = win_y
+    window_position = w_p
+    if window_position:
+        if window_position.count(",") != 1:
+            message = (
+                '\n\n  window_position expects an "x,y" string!'
+                '\n  (Your input was: "%s")\n' % window_position
+            )
+            raise Exception(message)
+        window_position = window_position.replace(" ", "")
+        win_x = None
+        win_y = None
+        try:
+            win_x = int(window_position.split(",")[0])
+            win_y = int(window_position.split(",")[1])
+        except Exception:
+            message = (
+                '\n\n  Expecting integer values for "x,y"!'
+                '\n  (window_position input was: "%s")\n'
+                % window_position
+            )
+            raise Exception(message)
+        settings.WINDOW_START_X = win_x
+        settings.WINDOW_START_Y = win_y
+    if window_size is None and size is not None:
+        window_size = size
     w_s = window_size
     if w_s is None and "--window-size" in arg_join:
         count = 0
@@ -482,30 +493,30 @@ def Driver(
                     w_s = None
                 break
             count += 1
-        window_size = w_s
-        if window_size:
-            if window_size.count(",") != 1:
-                message = (
-                    '\n\n  window_size expects a "width,height" string!'
-                    '\n  (Your input was: "%s")\n' % window_size
-                )
-                raise Exception(message)
-            window_size = window_size.replace(" ", "")
-            width = None
-            height = None
-            try:
-                width = int(window_size.split(",")[0])
-                height = int(window_size.split(",")[1])
-            except Exception:
-                message = (
-                    '\n\n  Expecting integer values for "width,height"!'
-                    '\n  (window_size input was: "%s")\n' % window_size
-                )
-                raise Exception(message)
-            settings.CHROME_START_WIDTH = width
-            settings.CHROME_START_HEIGHT = height
-            settings.HEADLESS_START_WIDTH = width
-            settings.HEADLESS_START_HEIGHT = height
+    window_size = w_s
+    if window_size:
+        if window_size.count(",") != 1:
+            message = (
+                '\n\n  window_size expects a "width,height" string!'
+                '\n  (Your input was: "%s")\n' % window_size
+            )
+            raise Exception(message)
+        window_size = window_size.replace(" ", "")
+        width = None
+        height = None
+        try:
+            width = int(window_size.split(",")[0])
+            height = int(window_size.split(",")[1])
+        except Exception:
+            message = (
+                '\n\n  Expecting integer values for "width,height"!'
+                '\n  (window_size input was: "%s")\n' % window_size
+            )
+            raise Exception(message)
+        settings.CHROME_START_WIDTH = width
+        settings.CHROME_START_HEIGHT = height
+        settings.HEADLESS_START_WIDTH = width
+        settings.HEADLESS_START_HEIGHT = height
     if agent is None and "--agent" in arg_join:
         count = 0
         for arg in sys_argv:
@@ -539,11 +550,7 @@ def Driver(
         or uc_sub
     ):
         undetectable = True
-    if (
-        (undetectable or undetected or uc)
-        and (uc_subprocess is None)
-        and (uc_sub is None)
-    ):
+    if undetectable or undetected or uc:
         uc_subprocess = True  # Use UC as a subprocess by default.
     elif (
         "--undetectable" in sys_argv
@@ -734,6 +741,8 @@ def Driver(
             swiftshader = True
         else:
             swiftshader = False
+    if locale is not None and locale_code is None:
+        locale_code = locale
     if ad_block is not None and ad_block_on is None:
         ad_block_on = ad_block
     if ad_block_on is None:
@@ -777,8 +786,6 @@ def Driver(
     browser_name = browser
 
     # Launch a web browser
-    from seleniumbase.core import browser_launcher
-
     driver = browser_launcher.get_driver(
         browser_name=browser_name,
         headless=headless,

@@ -4,6 +4,7 @@ import os
 import platform
 import sys
 import time
+from contextlib import suppress
 from seleniumbase import config as sb_config
 from seleniumbase.fixtures import constants
 
@@ -71,6 +72,60 @@ def get_terminal_width():
 def fix_colorama_if_windows():
     if is_windows():
         colorama.just_fix_windows_console()
+
+
+def fix_url_as_needed(url):
+    if not url:
+        url = "data:,"
+    elif url.startswith("//"):
+        url = "https:" + url
+    elif ":" not in url:
+        url = "https://" + url
+    return url
+
+
+def reconnect_if_disconnected(driver):
+    if (
+        hasattr(driver, "_is_using_uc")
+        and driver._is_using_uc
+        and hasattr(driver, "is_connected")
+        and not driver.is_connected()
+    ):
+        with suppress(Exception):
+            driver.connect()
+
+
+def is_cdp_swap_needed(driver):
+    """
+    When someone is using CDP Mode with a disconnected webdriver,
+    but they forget to reconnect before calling a webdriver method,
+    this method is used to substitute the webdriver method for a
+    CDP Mode method instead, which keeps CDP Stealth Mode enabled.
+    For other webdriver methods, SeleniumBase will reconnect first.
+    """
+    return (
+        hasattr(driver, "is_cdp_mode_active")
+        and driver.is_cdp_mode_active()
+        and hasattr(driver, "is_connected")
+        and not driver.is_connected()
+    )
+
+
+def is_chrome_130_or_newer(self, binary_location=None):
+    from seleniumbase.core import detect_b_ver
+
+    """Due to changes in Chrome-130, UC Mode freezes at start-up
+    unless the user-data-dir already exists and is populated."""
+    with suppress(Exception):
+        if not binary_location:
+            ver = detect_b_ver.get_browser_version_from_os("google-chrome")
+        else:
+            ver = detect_b_ver.get_browser_version_from_binary(
+                binary_location
+            )
+        if ver and len(ver) > 3 and int(ver.split(".")[0]) >= 130:
+            return True
+    return False
 
 
 def format_exc(exception, message):

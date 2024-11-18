@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import io
 import logging
 import os
@@ -165,9 +164,9 @@ class Patcher(object):
 
     @staticmethod
     def force_kill_instances(exe_name):
-        """ Terminate instances of UC.
-        :param: executable name to kill, may be a path as well
-        :return: True on success else False """
+        """Terminate instances of UC.
+        :param: Executable name to kill. (Can be a path)
+        :return: True on success else False."""
         exe_name = os.path.basename(exe_name)
         if IS_POSIX:
             r = os.system("kill -f -9 $(pidof %s)" % exe_name)
@@ -274,8 +273,8 @@ class Patcher(object):
 
     def __del__(self):
         if self._custom_exe_path:
-            # if the driver binary is specified by user
-            # we assume it is important enough to not delete it
+            # If the driver binary is specified by the user,
+            # then assume it is important enough to keep it.
             return
         else:
             timeout = 3
