@@ -231,6 +231,8 @@ self.get_gui_element_rect(selector, by="css selector")
 
 self.get_gui_element_center(selector, by="css selector")
 
+self.get_screen_rect()
+
 self.get_window_rect()
 
 self.get_window_size()
@@ -244,6 +246,10 @@ self.set_window_size(width, height)
 self.set_window_position(x, y)
 
 self.maximize_window()
+
+self.minimize_window()
+
+self.reset_window_size()
 
 self.switch_to_frame(frame="iframe", timeout=None)
 
@@ -361,6 +367,8 @@ self.get_saved_cookies(name="cookies.txt")
 self.get_cookie(name)
 
 self.get_cookies()
+
+self.get_cookie_string()
 
 self.add_cookie(cookie_dict, expiry=False)
 
@@ -962,6 +970,44 @@ self._print(TEXT)  # Calls Python's print() / Allows for translations
 
 ############
 
+# **** UC Mode methods. (uc=True / --uc) ****
+
+# (Mainly for CDP Mode)  -  (For all CDP methods, see the CDP Mode Docs)
+
+self.activate_cdp_mode(url=None)  # Activate CDP Mode on the given URL
+
+self.reconnect(timeout=0.1)  # disconnect() + sleep(timeout) + connect()
+
+self.disconnect()  # Stops the webdriver service to prevent detection
+
+self.connect()  # Starts the webdriver service to allow actions again
+
+# (For regular UC Mode)
+
+self.uc_open(url)  # (Open in same tab with default reconnect_time)
+
+self.uc_open_with_tab(url)  # (New tab with default reconnect_time)
+
+self.uc_open_with_reconnect(url, reconnect_time=None)  # (New tab)
+
+self.uc_open_with_disconnect(url, timeout=None)  # New tab + sleep()
+
+self.uc_click(selector)  # A stealthy click for evading bot-detection
+
+self.uc_gui_press_key(key)  # Use PyAutoGUI to press the keyboard key
+
+self.uc_gui_press_keys(keys)  # Use PyAutoGUI to press a list of keys
+
+self.uc_gui_write(text)  # Similar to uc_gui_press_keys(), but faster
+
+self.uc_gui_click_x_y(x, y, timeframe=0.25)  # PyAutoGUI click screen
+
+self.uc_gui_click_captcha(frame="iframe", retry=False, blind=False)
+
+self.uc_gui_handle_captcha(frame="iframe")
+
+############
+
 # "driver"-specific methods added (or modified) by SeleniumBase
 
 driver.default_get(url)  # Because driver.get(url) works differently in UC Mode
@@ -1068,7 +1114,9 @@ driver.uc_open_with_reconnect(url, reconnect_time=None)  # (New tab)
 
 driver.uc_open_with_disconnect(url, timeout=None)  # New tab + sleep()
 
-driver.reconnect(timeout)  # disconnect() + sleep(timeout) + connect()
+driver.uc_activate_cdp_mode(url=None)  # Activate CDP Mode on the given URL
+
+driver.reconnect(timeout=0.1)  # disconnect() + sleep(timeout) + connect()
 
 driver.disconnect()  # Stops the webdriver service to prevent detection
 
@@ -1085,12 +1133,8 @@ driver.uc_gui_write(text)  # Similar to uc_gui_press_keys(), but faster
 driver.uc_gui_click_x_y(x, y, timeframe=0.25)  # PyAutoGUI click screen
 
 driver.uc_gui_click_captcha(frame="iframe", retry=False, blind=False)
-# driver.uc_gui_click_cf(frame="iframe", retry=False, blind=False)
-# driver.uc_gui_click_rc(frame="iframe", retry=False, blind=False)
 
-driver.uc_gui_handle_captcha(frame="iframe")  # (Auto-detects the CAPTCHA)
-# driver.uc_gui_handle_cf(frame="iframe")  # PyAutoGUI click CF Turnstile
-# driver.uc_gui_handle_rc(frame="iframe")  # PyAutoGUI click G. reCAPTCHA
+driver.uc_gui_handle_captcha(frame="iframe")
 ```
 
 --------

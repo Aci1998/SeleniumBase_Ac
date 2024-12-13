@@ -120,7 +120,7 @@ def main():
 
     data = []
     data.append("[pytest]")
-    data.append("addopts = --capture=no -p no:cacheprovider")
+    data.append("addopts = --capture=tee-sys -p no:cacheprovider")
     data.append("norecursedirs = .* build dist recordings temp assets")
     data.append("filterwarnings =")
     data.append("    ignore::pytest.PytestWarning")
@@ -259,6 +259,7 @@ def main():
     data.append("report_archives")
     data.append("archived_reports")
     data.append("html_report.html")
+    data.append("last_report.html")
     data.append("report.html")
     data.append("report.xml")
     data.append("dashboard.html")

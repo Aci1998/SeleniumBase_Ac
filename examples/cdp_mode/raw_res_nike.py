@@ -25,10 +25,20 @@ async def receive_handler(event: mycdp.network.ResponseReceived):
     print(event.response)
 
 
-with SB(uc=True, test=True, locale_code="en") as sb:
-    sb.activate_cdp_mode("about:blank")
+with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+    url = "https://www.nike.com/"
+    sb.activate_cdp_mode(url)
     sb.cdp.add_handler(mycdp.network.RequestWillBeSent, send_handler)
     sb.cdp.add_handler(mycdp.network.ResponseReceived, receive_handler)
-    url = "https://seleniumbase.io/apps/calculator"
-    sb.cdp.open(url)
-    sb.sleep(1)
+    sb.sleep(2.5)
+    sb.cdp.gui_click_element('div[data-testid="user-tools-container"]')
+    sb.sleep(1.5)
+    search = "Nike Air Force 1"
+    sb.cdp.press_keys('input[type="search"]', search)
+    sb.sleep(4)
+    elements = sb.cdp.select_all('ul[data-testid*="products"] figure .details')
+    if elements:
+        print('**** Found results for "%s": ****' % search)
+    for element in elements:
+        print("* " + element.text)
+    sb.sleep(2)

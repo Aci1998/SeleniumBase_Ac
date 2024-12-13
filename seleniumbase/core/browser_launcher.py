@@ -97,19 +97,12 @@ def log_d(message):
         print(message)
 
 
-def make_executable(file_path):
-    # Set permissions to: "If you can read it, you can execute it."
-    mode = os.stat(file_path).st_mode
-    mode |= (mode & 0o444) >> 2  # copy R bits to X
-    os.chmod(file_path, mode)
-
-
 def make_driver_executable_if_not(driver_path):
     # Verify driver has executable permissions. If not, add them.
     permissions = oct(os.stat(driver_path)[0])[-3:]
     if "4" in permissions or "6" in permissions:
         # We want at least a '5' or '7' to make sure it's executable
-        make_executable(driver_path)
+        shared_utils.make_executable(driver_path)
 
 
 def extend_driver(driver):
@@ -216,8 +209,10 @@ def extend_driver(driver):
     driver.get_text = DM.get_text
     driver.get_active_element_css = DM.get_active_element_css
     driver.get_locale_code = DM.get_locale_code
+    driver.get_screen_rect = DM.get_screen_rect
     driver.get_origin = DM.get_origin
     driver.get_user_agent = DM.get_user_agent
+    driver.get_cookie_string = DM.get_cookie_string
     driver.highlight = DM.highlight
     driver.highlight_click = DM.highlight_click
     driver.highlight_if_visible = DM.highlight_if_visible
@@ -234,6 +229,7 @@ def extend_driver(driver):
     driver.switch_to_window = DM.switch_to_window
     driver.switch_to_tab = DM.switch_to_tab
     driver.switch_to_frame = DM.switch_to_frame
+    driver.reset_window_size = DM.reset_window_size
     if hasattr(driver, "proxy"):
         driver.set_wire_proxy = DM.set_wire_proxy
     return driver
@@ -556,6 +552,10 @@ def uc_open_with_cdp_mode(driver, url=None):
         for tab in driver.cdp_base.tabs[-1::-1]:
             if "chrome-extension://" not in str(tab):
                 with gui_lock:
+                    with suppress(Exception):
+                        shared_utils.make_writable(
+                            constants.MultiBrowser.PYAUTOGUILOCK
+                        )
                     loop.run_until_complete(tab.activate())
                 break
 
@@ -570,11 +570,17 @@ def uc_open_with_cdp_mode(driver, url=None):
         if page_tab:
             loop.run_until_complete(page_tab.aopen())
             with gui_lock:
+                with suppress(Exception):
+                    shared_utils.make_writable(
+                        constants.MultiBrowser.PYAUTOGUILOCK
+                    )
                 loop.run_until_complete(page_tab.activate())
 
     loop.run_until_complete(driver.cdp_base.update_targets())
     page = loop.run_until_complete(driver.cdp_base.get(url))
     with gui_lock:
+        with suppress(Exception):
+            shared_utils.make_writable(constants.MultiBrowser.PYAUTOGUILOCK)
         loop.run_until_complete(page.activate())
     loop.run_until_complete(page.wait())
     if not safe_url:
@@ -594,6 +600,7 @@ def uc_open_with_cdp_mode(driver, url=None):
     cdp.find_element = CDPM.find_element
     cdp.find = CDPM.find_element
     cdp.locator = CDPM.find_element
+    cdp.find_element_by_text = CDPM.find_element_by_text
     cdp.find_all = CDPM.find_all
     cdp.find_elements_by_text = CDPM.find_elements_by_text
     cdp.select = CDPM.select
@@ -603,12 +610,16 @@ def uc_open_with_cdp_mode(driver, url=None):
     cdp.click_nth_element = CDPM.click_nth_element
     cdp.click_nth_visible_element = CDPM.click_nth_visible_element
     cdp.click_link = CDPM.click_link
+    cdp.go_back = CDPM.go_back
+    cdp.go_forward = CDPM.go_forward
+    cdp.get_navigation_history = CDPM.get_navigation_history
     cdp.tile_windows = CDPM.tile_windows
     cdp.get_all_cookies = CDPM.get_all_cookies
     cdp.set_all_cookies = CDPM.set_all_cookies
     cdp.save_cookies = CDPM.save_cookies
     cdp.load_cookies = CDPM.load_cookies
     cdp.clear_cookies = CDPM.clear_cookies
+    cdp.sleep = CDPM.sleep
     cdp.bring_active_window_to_front = CDPM.bring_active_window_to_front
     cdp.bring_to_front = CDPM.bring_active_window_to_front
     cdp.get_active_element = CDPM.get_active_element
@@ -648,6 +659,7 @@ def uc_open_with_cdp_mode(driver, url=None):
     cdp.get_window = CDPM.get_window
     cdp.get_element_attributes = CDPM.get_element_attributes
     cdp.get_element_attribute = CDPM.get_element_attribute
+    cdp.get_attribute = CDPM.get_attribute
     cdp.get_element_html = CDPM.get_element_html
     cdp.get_element_rect = CDPM.get_element_rect
     cdp.get_element_size = CDPM.get_element_size
@@ -681,16 +693,28 @@ def uc_open_with_cdp_mode(driver, url=None):
     cdp.select_if_unselected = CDPM.select_if_unselected
     cdp.unselect_if_selected = CDPM.unselect_if_selected
     cdp.is_checked = CDPM.is_checked
+    cdp.is_selected = CDPM.is_selected
     cdp.is_element_present = CDPM.is_element_present
     cdp.is_element_visible = CDPM.is_element_visible
+    cdp.wait_for_element_visible = CDPM.wait_for_element_visible
+    cdp.assert_element = CDPM.assert_element
+    cdp.assert_element_visible = CDPM.assert_element_visible
     cdp.assert_element_present = CDPM.assert_element_present
     cdp.assert_element_absent = CDPM.assert_element_absent
-    cdp.assert_element = CDPM.assert_element
-    cdp.assert_element_visible = CDPM.assert_element
     cdp.assert_element_not_visible = CDPM.assert_element_not_visible
+    cdp.assert_element_attribute = CDPM.assert_element_attribute
     cdp.assert_title = CDPM.assert_title
+    cdp.assert_title_contains = CDPM.assert_title_contains
+    cdp.assert_url = CDPM.assert_url
+    cdp.assert_url_contains = CDPM.assert_url_contains
     cdp.assert_text = CDPM.assert_text
     cdp.assert_exact_text = CDPM.assert_exact_text
+    cdp.assert_true = CDPM.assert_true
+    cdp.assert_false = CDPM.assert_false
+    cdp.assert_equal = CDPM.assert_equal
+    cdp.assert_not_equal = CDPM.assert_not_equal
+    cdp.assert_in = CDPM.assert_in
+    cdp.assert_not_in = CDPM.assert_not_in
     cdp.scroll_into_view = CDPM.scroll_into_view
     cdp.scroll_to_y = CDPM.scroll_to_y
     cdp.scroll_to_top = CDPM.scroll_to_top
@@ -791,66 +815,79 @@ def verify_pyautogui_has_a_headed_browser(driver):
         )
 
 
+def __install_pyautogui_if_missing():
+    try:
+        import pyautogui
+        with suppress(Exception):
+            use_pyautogui_ver = constants.PyAutoGUI.VER
+            if pyautogui.__version__ != use_pyautogui_ver:
+                del pyautogui
+                shared_utils.pip_install(
+                    "pyautogui", version=use_pyautogui_ver
+                )
+                import pyautogui
+    except Exception:
+        print("\nPyAutoGUI required! Installing now...")
+        shared_utils.pip_install(
+            "pyautogui", version=constants.PyAutoGUI.VER
+        )
+        try:
+            import pyautogui
+        except Exception:
+            if (
+                IS_LINUX
+                and hasattr(sb_config, "xvfb")
+                and hasattr(sb_config, "headed")
+                and hasattr(sb_config, "headless")
+                and hasattr(sb_config, "headless2")
+                and (not sb_config.headed or sb_config.xvfb)
+                and not (sb_config.headless or sb_config.headless2)
+            ):
+                from sbvirtualdisplay import Display
+                xvfb_width = 1366
+                xvfb_height = 768
+                if (
+                    hasattr(sb_config, "_xvfb_width")
+                    and sb_config._xvfb_width
+                    and isinstance(sb_config._xvfb_width, int)
+                    and hasattr(sb_config, "_xvfb_height")
+                    and sb_config._xvfb_height
+                    and isinstance(sb_config._xvfb_height, int)
+                ):
+                    xvfb_width = sb_config._xvfb_width
+                    xvfb_height = sb_config._xvfb_height
+                    if xvfb_width < 1024:
+                        xvfb_width = 1024
+                    sb_config._xvfb_width = xvfb_width
+                    if xvfb_height < 768:
+                        xvfb_height = 768
+                    sb_config._xvfb_height = xvfb_height
+                with suppress(Exception):
+                    xvfb_display = Display(
+                        visible=True,
+                        size=(xvfb_width, xvfb_height),
+                        backend="xvfb",
+                        use_xauth=True,
+                    )
+                    xvfb_display.start()
+
+
 def install_pyautogui_if_missing(driver):
     verify_pyautogui_has_a_headed_browser(driver)
     pip_find_lock = fasteners.InterProcessLock(
         constants.PipInstall.FINDLOCK
     )
+    try:
+        with pip_find_lock:
+            pass
+    except Exception:
+        # Since missing permissions, skip the locks
+        __install_pyautogui_if_missing()
+        return
     with pip_find_lock:  # Prevent issues with multiple processes
-        try:
-            import pyautogui
-            with suppress(Exception):
-                use_pyautogui_ver = constants.PyAutoGUI.VER
-                if pyautogui.__version__ != use_pyautogui_ver:
-                    del pyautogui
-                    shared_utils.pip_install(
-                        "pyautogui", version=use_pyautogui_ver
-                    )
-                    import pyautogui
-        except Exception:
-            print("\nPyAutoGUI required! Installing now...")
-            shared_utils.pip_install(
-                "pyautogui", version=constants.PyAutoGUI.VER
-            )
-            try:
-                import pyautogui
-            except Exception:
-                if (
-                    IS_LINUX
-                    and hasattr(sb_config, "xvfb")
-                    and hasattr(sb_config, "headed")
-                    and hasattr(sb_config, "headless")
-                    and hasattr(sb_config, "headless2")
-                    and (not sb_config.headed or sb_config.xvfb)
-                    and not (sb_config.headless or sb_config.headless2)
-                ):
-                    from sbvirtualdisplay import Display
-                    xvfb_width = 1366
-                    xvfb_height = 768
-                    if (
-                        hasattr(sb_config, "_xvfb_width")
-                        and sb_config._xvfb_width
-                        and isinstance(sb_config._xvfb_width, int)
-                        and hasattr(sb_config, "_xvfb_height")
-                        and sb_config._xvfb_height
-                        and isinstance(sb_config._xvfb_height, int)
-                    ):
-                        xvfb_width = sb_config._xvfb_width
-                        xvfb_height = sb_config._xvfb_height
-                        if xvfb_width < 1024:
-                            xvfb_width = 1024
-                        sb_config._xvfb_width = xvfb_width
-                        if xvfb_height < 768:
-                            xvfb_height = 768
-                        sb_config._xvfb_height = xvfb_height
-                    with suppress(Exception):
-                        xvfb_display = Display(
-                            visible=True,
-                            size=(xvfb_width, xvfb_height),
-                            backend="xvfb",
-                            use_xauth=True,
-                        )
-                        xvfb_display.start()
+        with suppress(Exception):
+            shared_utils.make_writable(constants.PipInstall.FINDLOCK)
+        __install_pyautogui_if_missing()
 
 
 def get_configured_pyautogui(pyautogui_copy):
@@ -1159,7 +1196,12 @@ def _uc_gui_click_captcha(
                     frame = "%s div" % frame
                 elif (
                     driver.is_element_present('[name*="cf-turnstile-"]')
-                    and driver.is_element_present('[class*=spacer] + div div')
+                    and driver.is_element_present("#challenge-form div > div")
+                ):
+                    frame = "#challenge-form div > div"
+                elif (
+                    driver.is_element_present('[name*="cf-turnstile-"]')
+                    and driver.is_element_present("[class*=spacer] + div div")
                 ):
                     frame = '[class*=spacer] + div div'
                 elif (
@@ -1232,8 +1274,8 @@ def _uc_gui_click_captcha(
                 return
         try:
             if ctype == "g_rc" and not driver.is_connected():
-                x = (i_x + 32) * width_ratio
-                y = (i_y + 34) * width_ratio
+                x = (i_x + 29) * width_ratio
+                y = (i_y + 35) * width_ratio
             elif visible_iframe:
                 selector = "span"
                 if ctype == "g_rc":
@@ -1248,8 +1290,8 @@ def _uc_gui_click_captcha(
                 y = i_y + element.rect["y"] + (element.rect["height"] / 2.0)
                 y += 0.5
             else:
-                x = (i_x + 34) * width_ratio
-                y = (i_y + 34) * width_ratio
+                x = (i_x + 32) * width_ratio
+                y = (i_y + 32) * width_ratio
             if driver.is_connected():
                 driver.switch_to.default_content()
         except Exception:
@@ -1373,7 +1415,7 @@ def _uc_gui_handle_captcha_(driver, frame="iframe", ctype=None):
             ctype = "cf_t"
         else:
             return
-    if not driver.is_connected():
+    if not driver.is_connected() and not __is_cdp_swap_needed(driver):
         driver.connect()
         time.sleep(2)
     install_pyautogui_if_missing(driver)
@@ -1385,7 +1427,10 @@ def _uc_gui_handle_captcha_(driver, frame="iframe", ctype=None):
     )
     with gui_lock:  # Prevent issues with multiple processes
         needs_switch = False
-        is_in_frame = js_utils.is_in_frame(driver)
+        if not __is_cdp_swap_needed(driver):
+            is_in_frame = js_utils.is_in_frame(driver)
+        else:
+            is_in_frame = False
         selector = "#challenge-stage"
         if ctype == "g_rc":
             selector = "#recaptcha-token"
@@ -1393,16 +1438,13 @@ def _uc_gui_handle_captcha_(driver, frame="iframe", ctype=None):
             driver.switch_to.parent_frame()
             needs_switch = True
             is_in_frame = js_utils.is_in_frame(driver)
-        if not is_in_frame:
+        if not is_in_frame and not __is_cdp_swap_needed(driver):
             # Make sure the window is on top
             page_actions.switch_to_window(
                 driver, driver.current_window_handle, 2, uc_lock=False
             )
-        if (
-            IS_WINDOWS
-            and hasattr(pyautogui, "getActiveWindowTitle")
-        ):
-            py_a_g_title = pyautogui.getActiveWindowTitle()
+        if IS_WINDOWS and hasattr(pyautogui, "getActiveWindowTitle"):
+            py_a_g_title = pyautogui.getActiveWindowTitle() or ""
             window_title = driver.get_title()
             if not py_a_g_title.startswith(window_title):
                 window_rect = driver.get_window_rect()
@@ -1463,17 +1505,18 @@ def _uc_gui_handle_captcha_(driver, frame="iframe", ctype=None):
                 and frame == "iframe"
             ):
                 frame = 'iframe[title="reCAPTCHA"]'
-        if not is_in_frame or needs_switch:
-            # Currently not in frame (or nested frame outside CF one)
-            try:
-                if visible_iframe or ctype == "g_rc":
-                    driver.switch_to_frame(frame)
-            except Exception:
-                if visible_iframe or ctype == "g_rc":
-                    if driver.is_element_present("iframe"):
-                        driver.switch_to_frame("iframe")
-                    else:
-                        return
+        if not __is_cdp_swap_needed(driver):
+            if not is_in_frame or needs_switch:
+                # Currently not in frame (or nested frame outside CF one)
+                try:
+                    if visible_iframe or ctype == "g_rc":
+                        driver.switch_to_frame(frame)
+                except Exception:
+                    if visible_iframe or ctype == "g_rc":
+                        if driver.is_element_present("iframe"):
+                            driver.switch_to_frame("iframe")
+                        else:
+                            return
         try:
             selector = "div.cf-turnstile"
             if ctype == "g_rc":
@@ -1493,6 +1536,7 @@ def _uc_gui_handle_captcha_(driver, frame="iframe", ctype=None):
                     active_element_css.startswith(selector)
                     or active_element_css.endswith(" > div" * 2)
                     or (special_form and active_element_css.endswith(" div"))
+                    or (ctype == "g_rc" and "frame[name" in active_element_css)
                 ):
                     found_checkbox = True
                     sb_config._saved_cf_tab_count = tab_count
@@ -1506,9 +1550,13 @@ def _uc_gui_handle_captcha_(driver, frame="iframe", ctype=None):
             except Exception:
                 return
         if (
-            driver.is_element_present(".footer .clearfix .ray-id")
+            (
+                driver.is_element_present(".footer .clearfix .ray-id")
+                or driver.is_element_present("script[data-cf-beacon]")
+            )
             and hasattr(sb_config, "_saved_cf_tab_count")
             and sb_config._saved_cf_tab_count
+            and not __is_cdp_swap_needed(driver)
         ):
             driver.uc_open_with_disconnect(driver.current_url, 3.8)
             with suppress(Exception):
@@ -1723,22 +1771,34 @@ def _add_chrome_proxy_extension(
     ):
         # Single-threaded
         if zip_it:
-            proxy_helper.create_proxy_ext(
-                proxy_string, proxy_user, proxy_pass, bypass_list
-            )
-            proxy_zip = proxy_helper.PROXY_ZIP_PATH
-            chrome_options.add_extension(proxy_zip)
+            proxy_zip_lock = fasteners.InterProcessLock(PROXY_ZIP_LOCK)
+            with proxy_zip_lock:
+                proxy_helper.create_proxy_ext(
+                    proxy_string, proxy_user, proxy_pass, bypass_list
+                )
+                proxy_zip = proxy_helper.PROXY_ZIP_PATH
+                chrome_options.add_extension(proxy_zip)
         else:
-            proxy_helper.create_proxy_ext(
-                proxy_string, proxy_user, proxy_pass, bypass_list, zip_it=False
-            )
-            proxy_dir_path = proxy_helper.PROXY_DIR_PATH
-            chrome_options = add_chrome_ext_dir(chrome_options, proxy_dir_path)
+            proxy_dir_lock = fasteners.InterProcessLock(PROXY_DIR_LOCK)
+            with proxy_dir_lock:
+                proxy_helper.create_proxy_ext(
+                    proxy_string,
+                    proxy_user,
+                    proxy_pass,
+                    bypass_list,
+                    zip_it=False,
+                )
+                proxy_dir_path = proxy_helper.PROXY_DIR_PATH
+                chrome_options = add_chrome_ext_dir(
+                    chrome_options, proxy_dir_path
+                )
     else:
         # Multi-threaded
         if zip_it:
             proxy_zip_lock = fasteners.InterProcessLock(PROXY_ZIP_LOCK)
             with proxy_zip_lock:
+                with suppress(Exception):
+                    shared_utils.make_writable(PROXY_ZIP_LOCK)
                 if multi_proxy:
                     _set_proxy_filenames()
                 if not os.path.exists(proxy_helper.PROXY_ZIP_PATH):
@@ -1750,6 +1810,8 @@ def _add_chrome_proxy_extension(
         else:
             proxy_dir_lock = fasteners.InterProcessLock(PROXY_DIR_LOCK)
             with proxy_dir_lock:
+                with suppress(Exception):
+                    shared_utils.make_writable(PROXY_DIR_LOCK)
                 if multi_proxy:
                     _set_proxy_filenames()
                 if not os.path.exists(proxy_helper.PROXY_DIR_PATH):
@@ -1758,7 +1820,7 @@ def _add_chrome_proxy_extension(
                         proxy_user,
                         proxy_pass,
                         bypass_list,
-                        False,
+                        zip_it=False,
                     )
                 chrome_options = add_chrome_ext_dir(
                     chrome_options, proxy_helper.PROXY_DIR_PATH
@@ -1775,6 +1837,8 @@ def is_using_uc(undetectable, browser_name):
 def _unzip_to_new_folder(zip_file, folder):
     proxy_dir_lock = fasteners.InterProcessLock(PROXY_DIR_LOCK)
     with proxy_dir_lock:
+        with suppress(Exception):
+            shared_utils.make_writable(PROXY_DIR_LOCK)
         if not os.path.exists(folder):
             import zipfile
             zip_ref = zipfile.ZipFile(zip_file, "r")
@@ -2259,7 +2323,6 @@ def _set_chrome_options(
     chrome_options.add_argument("--disable-ipc-flooding-protection")
     chrome_options.add_argument("--disable-password-generation")
     chrome_options.add_argument("--disable-domain-reliability")
-    chrome_options.add_argument("--disable-component-update")
     chrome_options.add_argument("--disable-breakpad")
     included_disabled_features = []
     included_disabled_features.append("OptimizationHints")
@@ -2442,10 +2505,8 @@ def _set_firefox_options(
         firefox_arg_list = firefox_arg.split(",")
         for firefox_arg_item in firefox_arg_list:
             firefox_arg_item = firefox_arg_item.strip()
-            if not firefox_arg_item.startswith("--"):
-                if firefox_arg_item.startswith("-"):
-                    firefox_arg_item = "-" + firefox_arg_item
-                else:
+            if not firefox_arg_item.startswith("-"):
+                if firefox_arg_item.count(os.sep) == 0:
                     firefox_arg_item = "--" + firefox_arg_item
             if len(firefox_arg_item) >= 3:
                 options.add_argument(firefox_arg_item)
@@ -2886,6 +2947,8 @@ def get_remote_driver(
             constants.PipInstall.FINDLOCK
         )
         with pip_find_lock:  # Prevent issues with multiple processes
+            with suppress(Exception):
+                shared_utils.make_writable(constants.PipInstall.FINDLOCK)
             try:
                 from seleniumwire import webdriver
                 import blinker
@@ -3323,6 +3386,8 @@ def get_local_driver(
             constants.PipInstall.FINDLOCK
         )
         with pip_find_lock:  # Prevent issues with multiple processes
+            with suppress(Exception):
+                shared_utils.make_writable(constants.PipInstall.FINDLOCK)
             try:
                 from seleniumwire import webdriver
                 import blinker
@@ -3386,6 +3451,10 @@ def get_local_driver(
                     constants.MultiBrowser.DRIVER_FIXING_LOCK
                 )
                 with geckodriver_fixing_lock:
+                    with suppress(Exception):
+                        shared_utils.make_writable(
+                            constants.MultiBrowser.DRIVER_FIXING_LOCK
+                        )
                     if not geckodriver_on_path():
                         sys_args = sys.argv  # Save a copy of sys args
                         log_d(
@@ -3688,6 +3757,10 @@ def get_local_driver(
                     constants.MultiBrowser.DRIVER_FIXING_LOCK
                 )
                 with edgedriver_fixing_lock:
+                    with suppress(Exception):
+                        shared_utils.make_writable(
+                            constants.MultiBrowser.DRIVER_FIXING_LOCK
+                        )
                     msg = "Microsoft Edge Driver not found."
                     if edgedriver_upgrade_needed:
                         msg = "Microsoft Edge Driver update needed."
@@ -3999,7 +4072,6 @@ def get_local_driver(
         edge_options.add_argument("--disable-ipc-flooding-protection")
         edge_options.add_argument("--disable-password-generation")
         edge_options.add_argument("--disable-domain-reliability")
-        edge_options.add_argument("--disable-component-update")
         edge_options.add_argument("--disable-breakpad")
         included_disabled_features = []
         included_disabled_features.append("OptimizationHints")
@@ -4071,6 +4143,10 @@ def get_local_driver(
                     constants.MultiBrowser.DRIVER_FIXING_LOCK
                 )
                 with edgedriver_fixing_lock:
+                    with suppress(Exception):
+                        shared_utils.make_writable(
+                            constants.MultiBrowser.DRIVER_FIXING_LOCK
+                        )
                     with suppress(Exception):
                         if not _was_driver_repaired():
                             _repair_edgedriver(edge_version)
@@ -4453,6 +4529,10 @@ def get_local_driver(
                         constants.MultiBrowser.DRIVER_FIXING_LOCK
                     )
                     with chromedriver_fixing_lock:
+                        with suppress(Exception):
+                            shared_utils.make_writable(
+                                constants.MultiBrowser.DRIVER_FIXING_LOCK
+                            )
                         msg = "chromedriver update needed. Getting it now:"
                         if not path_chromedriver:
                             msg = "chromedriver not found. Getting it now:"
@@ -4544,6 +4624,10 @@ def get_local_driver(
                     constants.MultiBrowser.DRIVER_FIXING_LOCK
                 )
                 with uc_lock:  # Avoid multithreaded issues
+                    with suppress(Exception):
+                        shared_utils.make_writable(
+                            constants.MultiBrowser.DRIVER_FIXING_LOCK
+                        )
                     if make_uc_driver_from_chromedriver:
                         if os.path.exists(LOCAL_CHROMEDRIVER):
                             with suppress(Exception):
@@ -4776,7 +4860,12 @@ def get_local_driver(
                                 )
                                 uc_activated = True
                             except URLError as e:
-                                if cert in e.args[0] and IS_MAC:
+                                if (
+                                    IS_MAC
+                                    and hasattr(e, "args")
+                                    and isinstance(e.args, (list, tuple))
+                                    and cert in e.args[0]
+                                ):
                                     mac_certificate_error = True
                                 else:
                                     raise
@@ -4803,6 +4892,10 @@ def get_local_driver(
                                 if not os.path.exists(cf_lock_path):
                                     # Avoid multithreaded issues
                                     with cf_lock:
+                                        with suppress(Exception):
+                                            shared_utils.make_writable(
+                                                cf_lock_path
+                                            )
                                         # Install Python Certificates (MAC)
                                         os.system(
                                             r"bash /Applications/Python*/"
@@ -4946,6 +5039,10 @@ def get_local_driver(
                             constants.MultiBrowser.DRIVER_FIXING_LOCK
                         )
                         with chromedriver_fixing_lock:
+                            with suppress(Exception):
+                                shared_utils.make_writable(
+                                    constants.MultiBrowser.DRIVER_FIXING_LOCK
+                                )
                             if not _was_driver_repaired():
                                 _repair_chromedriver(
                                     chrome_options, headless_options, mcv
@@ -5144,7 +5241,10 @@ def get_local_driver(
                             chromedr_fixing_lock = fasteners.InterProcessLock(
                                 constants.MultiBrowser.DRIVER_FIXING_LOCK
                             )
+                            D_F_L = constants.MultiBrowser.DRIVER_FIXING_LOCK
                             with chromedr_fixing_lock:
+                                with suppress(Exception):
+                                    shared_utils.make_writable(D_F_L)
                                 if not _was_driver_repaired():
                                     with suppress(Exception):
                                         _repair_chromedriver(

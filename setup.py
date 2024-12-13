@@ -147,11 +147,11 @@ setup(
     ],
     python_requires=">=3.8",
     install_requires=[
-        'pip>=24.2',
+        'pip>=24.3.1',
         'packaging>=24.2',
         'setuptools~=70.2;python_version<"3.10"',  # Newer ones had issues
-        'setuptools>=75.5.0;python_version>="3.10"',
-        'wheel>=0.45.0',
+        'setuptools>=75.6.0;python_version>="3.10"',
+        'wheel>=0.45.1',
         'attrs>=24.2.0',
         "certifi>=2024.8.30",
         "exceptiongroup>=1.2.2",
@@ -163,8 +163,8 @@ setup(
         "pynose>=1.5.3",
         'platformdirs>=4.3.6',
         'typing-extensions>=4.12.2',
-        "sbvirtualdisplay>=1.3.0",
-        "six>=1.16.0",
+        "sbvirtualdisplay>=1.3.1",
+        "six>=1.17.0",
         'parse>=1.20.2',
         'parse-type>=0.6.4',
         'colorama>=0.4.6',
@@ -186,18 +186,18 @@ setup(
         'trio-websocket==0.11.1',
         'wsproto==1.2.0',
         'websocket-client==1.8.0',
-        'selenium==4.26.1',
+        'selenium==4.27.1',
         'cssselect==1.2.0',
         "sortedcontainers==2.4.0",
         'execnet==2.1.1',
         'iniconfig==2.0.0',
         'pluggy==1.5.0',
-        "py==1.11.0",  # Needed by pytest-html
-        'pytest==8.3.3',
-        "pytest-html==2.0.1",  # Newer ones had issues
+        'pytest==8.3.4',
+        "pytest-html==4.0.2",  # Newer ones had issues
         'pytest-metadata==3.1.1',
         "pytest-ordering==0.6",
-        'pytest-rerunfailures==14.0',
+        'pytest-rerunfailures==14.0;python_version<"3.9"',
+        'pytest-rerunfailures==15.0;python_version>="3.9"',
         'pytest-xdist==3.6.1',
         'parameterized==0.9.0',
         "behave==1.2.6",
@@ -222,7 +222,7 @@ setup(
         # Usage: coverage run -m pytest; coverage html; coverage report
         "coverage": [
             'coverage>=7.6.1;python_version<"3.9"',
-            'coverage>=7.6.5;python_version>="3.9"',
+            'coverage>=7.6.9;python_version>="3.9"',
             'pytest-cov>=5.0.0;python_version<"3.9"',
             'pytest-cov>=6.0.0;python_version>="3.9"',
         ],
@@ -253,7 +253,7 @@ setup(
         "pdfminer": [
             'pdfminer.six==20240706',
             'cryptography==39.0.2;python_version<"3.9"',
-            'cryptography==43.0.3;python_version>="3.9"',
+            'cryptography==44.0.0;python_version>="3.9"',
             'cffi==1.17.1',
             "pycparser==2.22",
         ],

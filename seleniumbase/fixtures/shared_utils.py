@@ -1,6 +1,7 @@
 """Shared utility methods"""
 import colorama
 import os
+import pathlib
 import platform
 import sys
 import time
@@ -126,6 +127,30 @@ def is_chrome_130_or_newer(self, binary_location=None):
         if ver and len(ver) > 3 and int(ver.split(".")[0]) >= 130:
             return True
     return False
+
+
+def make_dir_files_writable(dir_path):
+    # Make all files in the given directory writable.
+    for file_path in pathlib.Path(dir_path).glob("*"):
+        if file_path.is_file():
+            mode = os.stat(file_path).st_mode
+            mode |= (mode & 0o444) >> 1  # copy R bits to W
+            with suppress(Exception):
+                os.chmod(file_path, mode)
+
+
+def make_writable(file_path):
+    # Set permissions to: "If you can read it, you can write it."
+    mode = os.stat(file_path).st_mode
+    mode |= (mode & 0o444) >> 1  # copy R bits to W
+    os.chmod(file_path, mode)
+
+
+def make_executable(file_path):
+    # Set permissions to: "If you can read it, you can execute it."
+    mode = os.stat(file_path).st_mode
+    mode |= (mode & 0o444) >> 2  # copy R bits to X
+    os.chmod(file_path, mode)
 
 
 def format_exc(exception, message):

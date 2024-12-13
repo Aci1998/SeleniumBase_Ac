@@ -1,19 +1,23 @@
 from seleniumbase import SB
 
-with SB(uc=True, test=True, locale_code="en") as sb:
+with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
     url = "https://www.southwest.com/air/booking/"
     sb.activate_cdp_mode(url)
     sb.sleep(2.8)
     origin = "DEN"
     destination = "PHX"
     sb.cdp.gui_click_element("input#originationAirportCode")
-    sb.sleep(0.2)
+    sb.sleep(0.5)
+    sb.uc_gui_press_keys(" " + "\n")
+    sb.sleep(0.5)
+    sb.cdp.gui_click_element("input#originationAirportCode")
+    sb.sleep(0.5)
     sb.uc_gui_press_keys(origin + "\n")
     sb.sleep(0.5)
     sb.cdp.gui_click_element("h1.heading")
     sb.sleep(0.5)
     sb.cdp.gui_click_element("input#destinationAirportCode")
-    sb.sleep(0.2)
+    sb.sleep(0.5)
     sb.uc_gui_press_keys(destination + "\n")
     sb.sleep(0.5)
     sb.cdp.gui_click_element("h1.heading")

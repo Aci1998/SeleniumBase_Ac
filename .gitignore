@@ -4,18 +4,18 @@
 # Packages
 *.egg
 *.egg-info
-dist
-build
 .eggs
 eggs
-parts
-bin
-var
-sdist
 develop-eggs
-.installed.cfg
+bin
+build
+dist
 lib
 lib64
+parts
+sdist
+var
+.installed.cfg
 __pycache__
 
 # Python3 pyvenv
@@ -100,6 +100,7 @@ latest_report
 report_archives
 archived_reports
 html_report.html
+last_report.html
 report.html
 report.xml
 

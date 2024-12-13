@@ -20,8 +20,16 @@ class CDPMethods():
         self.driver = driver
 
     def __slow_mode_pause_if_set(self):
-        if hasattr(sb_config, "slow_mode") and sb_config.slow_mode:
-            time.sleep(0.16)
+        if (
+            (hasattr(sb_config, "demo_mode") and sb_config.demo_mode)
+            or "--demo" in sys.argv
+        ):
+            time.sleep(0.48)
+        elif (
+            (hasattr(sb_config, "slow_mode") and sb_config.slow_mode)
+            or "--slow" in sys.argv
+        ):
+            time.sleep(0.24)
 
     def __add_light_pause(self):
         time.sleep(0.007)
@@ -75,6 +83,9 @@ class CDPMethods():
         element.get_position = lambda: self.__get_position(element)
         element.get_html = lambda: self.__get_html(element)
         element.get_js_attributes = lambda: self.__get_js_attributes(element)
+        element.get_attribute = (
+            lambda attribute: self.__get_attribute(element, attribute)
+        )
         return element
 
     def get(self, url):
@@ -127,23 +138,10 @@ class CDPMethods():
         self.__add_light_pause()
         selector = self.__convert_to_css_if_xpath(selector)
         early_failure = False
-        if (":contains(" in selector):
-            tag_name = selector.split(":contains(")[0].split(" ")[-1]
-            text = selector.split(":contains(")[1].split(")")[0][1:-1]
-            with suppress(Exception):
-                self.loop.run_until_complete(
-                    self.page.select(tag_name, timeout=timeout)
-                )
-                self.loop.run_until_complete(
-                    self.page.find(text, timeout=timeout)
-                )
-            elements = []
-            with suppress(Exception):
-                elements = self.find_elements_by_text(text, tag_name=tag_name)
-            if elements:
-                return self.__add_sync_methods(elements[0])
-            else:
-                early_failure = True
+        if (":contains(") in selector:
+            selector, _ = page_utils.recalculate_selector(
+                selector, by="css selector", xp_ok=True
+            )
         failure = False
         try:
             if early_failure:
@@ -169,6 +167,57 @@ class CDPMethods():
         self.__slow_mode_pause_if_set()
         return element
 
+    def find_element_by_text(
+        self, text, tag_name=None, timeout=settings.SMALL_TIMEOUT
+    ):
+        """Returns an element by matching text.
+        Optionally, provide a tag_name to narrow down the search to an
+        element with the given tag. (Eg: a, button, div, script, span)"""
+        self.__add_light_pause()
+        time_now = time.time()
+        self.assert_text(text, timeout=timeout)
+        spent = int(time.time() - time_now)
+        remaining = 1 + timeout - spent
+        if tag_name:
+            self.assert_element(tag_name, timeout=remaining)
+        elements = self.loop.run_until_complete(
+            self.page.find_elements_by_text(text=text)
+        )
+        if tag_name:
+            tag_name = tag_name.lower().strip()
+        for element in elements:
+            if element and not tag_name:
+                element = self.__add_sync_methods(element)
+                return self.__add_sync_methods(element)
+            elif (
+                element
+                and tag_name in element.tag_name.lower()
+                and text.strip() in element.text
+            ):
+                element = self.__add_sync_methods(element)
+                return self.__add_sync_methods(element)
+            elif (
+                element.parent
+                and tag_name in element.parent.tag_name.lower()
+                and text.strip() in element.parent.text
+            ):
+                element = self.__add_sync_methods(element.parent)
+                return self.__add_sync_methods(element)
+            elif (
+                element.parent.parent
+                and tag_name in element.parent.parent.tag_name.lower()
+                and text.strip() in element.parent.parent.text
+            ):
+                element = self.__add_sync_methods(element.parent.parent)
+                return self.__add_sync_methods(element)
+        plural = "s"
+        if timeout == 1:
+            plural = ""
+        raise Exception(
+            "Text {%s} with tag {%s} was not found after %s second%s!"
+            % (text, tag_name, timeout, plural)
+        )
+
     def find_all(self, selector, timeout=settings.SMALL_TIMEOUT):
         self.__add_light_pause()
         selector = self.__convert_to_css_if_xpath(selector)
@@ -179,26 +228,48 @@ class CDPMethods():
         for element in elements:
             element = self.__add_sync_methods(element)
             updated_elements.append(element)
-        self.__slow_mode_pause_if_set()
         return updated_elements
 
     def find_elements_by_text(self, text, tag_name=None):
         """Returns a list of elements by matching text.
-        Optionally, provide a tag_name to narrow down the search
-        to only elements with the given tag. (Eg: a, div, script, span)"""
+        Optionally, provide a tag_name to narrow down the search to only
+        elements with the given tag. (Eg: a, button, div, script, span)"""
         self.__add_light_pause()
         elements = self.loop.run_until_complete(
             self.page.find_elements_by_text(text=text)
         )
         updated_elements = []
+        if tag_name:
+            tag_name = tag_name.lower().strip()
         for element in elements:
-            if (
-                not tag_name
-                or tag_name.lower().strip() in element.tag_name.lower().strip()
+            if element and not tag_name:
+                element = self.__add_sync_methods(element)
+                if element not in updated_elements:
+                    updated_elements.append(element)
+            elif (
+                element
+                and tag_name in element.tag_name.lower()
+                and text.strip() in element.text
             ):
                 element = self.__add_sync_methods(element)
-                updated_elements.append(element)
-        self.__slow_mode_pause_if_set()
+                if element not in updated_elements:
+                    updated_elements.append(element)
+            elif (
+                element.parent
+                and tag_name in element.parent.tag_name.lower()
+                and text.strip() in element.parent.text
+            ):
+                element = self.__add_sync_methods(element.parent)
+                if element not in updated_elements:
+                    updated_elements.append(element)
+            elif (
+                element.parent.parent
+                and tag_name in element.parent.parent.tag_name.lower()
+                and text.strip() in element.parent.parent.text
+            ):
+                element = self.__add_sync_methods(element.parent.parent)
+                if element not in updated_elements:
+                    updated_elements.append(element)
         return updated_elements
 
     def select(self, selector, timeout=settings.SMALL_TIMEOUT):
@@ -246,7 +317,6 @@ class CDPMethods():
         for element in elements:
             element = self.__add_sync_methods(element)
             updated_elements.append(element)
-        self.__slow_mode_pause_if_set()
         return updated_elements
 
     def find_elements(self, selector, timeout=settings.SMALL_TIMEOUT):
@@ -273,6 +343,7 @@ class CDPMethods():
         if number < 0:
             number = 0
         element = elements[number]
+        element.scroll_into_view()
         element.click()
 
     def click_nth_visible_element(self, selector, number):
@@ -289,10 +360,20 @@ class CDPMethods():
         if number < 0:
             number = 0
         element = elements[number]
+        element.scroll_into_view()
         element.click()
 
     def click_link(self, link_text):
         self.find_elements_by_text(link_text, "a")[0].click()
+
+    def go_back(self):
+        self.loop.run_until_complete(self.page.back())
+
+    def go_forward(self):
+        self.loop.run_until_complete(self.page.forward())
+
+    def get_navigation_history(self):
+        return self.loop.run_until_complete(self.page.get_navigation_history())
 
     def __clear_input(self, element):
         return (
@@ -307,6 +388,13 @@ class CDPMethods():
         return result
 
     def __flash(self, element, *args, **kwargs):
+        element.scroll_into_view()
+        if len(args) < 3 and "x_offset" not in kwargs:
+            x_offset = self.__get_x_scroll_offset()
+            kwargs["x_offset"] = x_offset
+        if len(args) < 3 and "y_offset" not in kwargs:
+            y_offset = self.__get_y_scroll_offset()
+            kwargs["y_offset"] = y_offset
         return (
             self.loop.run_until_complete(
                 element.flash_async(*args, **kwargs)
@@ -378,9 +466,9 @@ class CDPMethods():
         )
 
     def __scroll_into_view(self, element):
-        return (
-            self.loop.run_until_complete(element.scroll_into_view_async())
-        )
+        self.loop.run_until_complete(element.scroll_into_view_async())
+        self.__add_light_pause()
+        return None
 
     def __select_option(self, element):
         return (
@@ -426,6 +514,24 @@ class CDPMethods():
         return (
             self.loop.run_until_complete(element.get_js_attributes_async())
         )
+
+    def __get_attribute(self, element, attribute):
+        try:
+            return element.get_js_attributes()[attribute]
+        except Exception:
+            return None
+
+    def __get_x_scroll_offset(self):
+        x_scroll_offset = self.loop.run_until_complete(
+            self.page.evaluate("window.pageXOffset")
+        )
+        return x_scroll_offset or 0
+
+    def __get_y_scroll_offset(self):
+        y_scroll_offset = self.loop.run_until_complete(
+            self.page.evaluate("window.pageYOffset")
+        )
+        return y_scroll_offset or 0
 
     def tile_windows(self, windows=None, max_columns=0):
         """Tile windows and return the grid of tiled windows."""
@@ -500,7 +606,7 @@ class CDPMethods():
     def click(self, selector, timeout=settings.SMALL_TIMEOUT):
         self.__slow_mode_pause_if_set()
         element = self.find_element(selector, timeout=timeout)
-        self.__add_light_pause()
+        element.scroll_into_view()
         element.click()
         self.__slow_mode_pause_if_set()
         self.loop.run_until_complete(self.page.wait())
@@ -514,7 +620,9 @@ class CDPMethods():
 
     def click_if_visible(self, selector):
         if self.is_element_visible(selector):
-            self.find_element(selector).click()
+            element = self.find_element(selector)
+            element.scroll_into_view()
+            element.click()
             self.__slow_mode_pause_if_set()
             self.loop.run_until_complete(self.page.wait())
 
@@ -541,9 +649,10 @@ class CDPMethods():
                 except Exception:
                     continue
                 if (width != 0 or height != 0):
+                    element.scroll_into_view()
                     element.click()
                     click_count += 1
-                    time.sleep(0.0375)
+                    time.sleep(0.042)
                     self.__slow_mode_pause_if_set()
                     self.loop.run_until_complete(self.page.wait())
             except Exception:
@@ -553,7 +662,7 @@ class CDPMethods():
         """(Attempt simulating a mouse click)"""
         self.__slow_mode_pause_if_set()
         element = self.find_element(selector, timeout=timeout)
-        self.__add_light_pause()
+        element.scroll_into_view()
         element.mouse_click()
         self.__slow_mode_pause_if_set()
         self.loop.run_until_complete(self.page.wait())
@@ -575,6 +684,7 @@ class CDPMethods():
 
     def select_option_by_text(self, dropdown_selector, option):
         element = self.find_element(dropdown_selector)
+        element.scroll_into_view()
         options = element.query_selector_all("option")
         for found_option in options:
             if found_option.text.strip() == option.strip():
@@ -595,7 +705,10 @@ class CDPMethods():
         """Paint a quickly-vanishing dot over an element."""
         selector = self.__convert_to_css_if_xpath(selector)
         element = self.find_element(selector)
-        element.flash(duration=duration, color=color)
+        element.scroll_into_view()
+        x_offset = self.__get_x_scroll_offset()
+        y_offset = self.__get_y_scroll_offset()
+        element.flash(duration, color, x_offset, y_offset)
         if pause and isinstance(pause, (int, float)):
             time.sleep(pause)
 
@@ -603,17 +716,22 @@ class CDPMethods():
         """Highlight an element with multi-colors."""
         selector = self.__convert_to_css_if_xpath(selector)
         element = self.find_element(selector)
-        element.flash(0.46, "44CC88")
+        element.scroll_into_view()
+        x_offset = self.__get_x_scroll_offset()
+        y_offset = self.__get_y_scroll_offset()
+        element.flash(0.46, "44CC88", x_offset, y_offset)
         time.sleep(0.15)
-        element.flash(0.42, "8844CC")
+        element.flash(0.42, "8844CC", x_offset, y_offset)
         time.sleep(0.15)
-        element.flash(0.38, "CC8844")
+        element.flash(0.38, "CC8844", x_offset, y_offset)
         time.sleep(0.15)
-        element.flash(0.30, "44CC88")
+        element.flash(0.30, "44CC88", x_offset, y_offset)
         time.sleep(0.30)
 
     def focus(self, selector):
-        self.find_element(selector).focus()
+        element = self.find_element(selector)
+        element.scroll_into_view()
+        element.focus()
 
     def highlight_overlay(self, selector):
         self.find_element(selector).highlight_overlay()
@@ -642,7 +760,7 @@ class CDPMethods():
     def send_keys(self, selector, text, timeout=settings.SMALL_TIMEOUT):
         self.__slow_mode_pause_if_set()
         element = self.select(selector, timeout=timeout)
-        self.__add_light_pause()
+        element.scroll_into_view()
         if text.endswith("\n") or text.endswith("\r"):
             text = text[:-1] + "\r\n"
         element.send_keys(text)
@@ -653,17 +771,17 @@ class CDPMethods():
         """Similar to send_keys(), but presses keys at human speed."""
         self.__slow_mode_pause_if_set()
         element = self.select(selector, timeout=timeout)
-        self.__add_light_pause()
+        element.scroll_into_view()
         submit = False
         if text.endswith("\n") or text.endswith("\r"):
             submit = True
             text = text[:-1]
         for key in text:
             element.send_keys(key)
-            time.sleep(0.0375)
+            time.sleep(0.044)
         if submit:
             element.send_keys("\r\n")
-            time.sleep(0.0375)
+            time.sleep(0.044)
         self.__slow_mode_pause_if_set()
         self.loop.run_until_complete(self.page.wait())
 
@@ -671,7 +789,7 @@ class CDPMethods():
         """Similar to send_keys(), but clears the text field first."""
         self.__slow_mode_pause_if_set()
         element = self.select(selector, timeout=timeout)
-        self.__add_light_pause()
+        element.scroll_into_view()
         with suppress(Exception):
             element.clear_input()
         if text.endswith("\n") or text.endswith("\r"):
@@ -684,8 +802,8 @@ class CDPMethods():
         """Similar to send_keys(), but clears the text field first."""
         self.__slow_mode_pause_if_set()
         selector = self.__convert_to_css_if_xpath(selector)
-        self.select(selector, timeout=timeout)
-        self.__add_light_pause()
+        element = self.select(selector, timeout=timeout)
+        element.scroll_into_view()
         press_enter = False
         if text.endswith("\n"):
             text = text[:-1]
@@ -718,12 +836,16 @@ class CDPMethods():
 
     def evaluate(self, expression):
         """Run a JavaScript expression and return the result."""
+        if expression.startswith("return "):
+            expression = expression[len("return "):]
         return self.loop.run_until_complete(
             self.page.evaluate(expression)
         )
 
     def js_dumps(self, obj_name):
         """Similar to evaluate(), but for dictionary results."""
+        if obj_name.startswith("return "):
+            obj_name = obj_name[len("return "):]
         return self.loop.run_until_complete(
             self.page.js_dumps(obj_name)
         )
@@ -733,7 +855,7 @@ class CDPMethods():
             return
         elif self.get_window()[1].window_state.value == "minimized":
             self.loop.run_until_complete(self.page.maximize())
-            time.sleep(0.0375)
+            time.sleep(0.044)
         return self.loop.run_until_complete(self.page.maximize())
 
     def minimize(self):
@@ -743,7 +865,7 @@ class CDPMethods():
     def medimize(self):
         if self.get_window()[1].window_state.value == "minimized":
             self.loop.run_until_complete(self.page.medimize())
-            time.sleep(0.0375)
+            time.sleep(0.044)
         return self.loop.run_until_complete(self.page.medimize())
 
     def set_window_rect(self, x, y, width, height):
@@ -752,7 +874,7 @@ class CDPMethods():
                 self.page.set_window_size(
                     left=x, top=y, width=width, height=height)
             )
-            time.sleep(0.0375)
+            time.sleep(0.044)
         return self.loop.run_until_complete(
             self.page.set_window_size(
                 left=x, top=y, width=width, height=height)
@@ -972,8 +1094,10 @@ class CDPMethods():
         )
 
     def get_element_attribute(self, selector, attribute):
-        attributes = self.get_element_attributes(selector)
-        return attributes[attribute]
+        return self.get_element_attributes(selector)[attribute]
+
+    def get_attribute(self, selector, attribute):
+        return self.find_element(selector).get_attribute(attribute)
 
     def get_element_html(self, selector):
         selector = self.__convert_to_css_if_xpath(selector)
@@ -1011,6 +1135,10 @@ class CDPMethods():
         with suppress(Exception):
             self.loop.run_until_complete(self.page.evaluate(js_code))
 
+    def __make_sure_pyautogui_lock_is_writable(self):
+        with suppress(Exception):
+            shared_utils.make_writable(constants.MultiBrowser.PYAUTOGUILOCK)
+
     def __verify_pyautogui_has_a_headed_browser(self):
         """PyAutoGUI requires a headed browser so that it can
         focus on the correct element when performing actions."""
@@ -1031,6 +1159,8 @@ class CDPMethods():
             constants.PipInstall.FINDLOCK
         )
         with pip_find_lock:  # Prevent issues with multiple processes
+            with suppress(Exception):
+                shared_utils.make_writable(constants.PipInstall.FINDLOCK)
             try:
                 import pyautogui
                 with suppress(Exception):
@@ -1116,8 +1246,9 @@ class CDPMethods():
             constants.MultiBrowser.PYAUTOGUILOCK
         )
         with gui_lock:
+            self.__make_sure_pyautogui_lock_is_writable()
             pyautogui.press(key)
-            time.sleep(0.0375)
+            time.sleep(0.044)
         self.__slow_mode_pause_if_set()
         self.loop.run_until_complete(self.page.wait())
 
@@ -1129,9 +1260,10 @@ class CDPMethods():
             constants.MultiBrowser.PYAUTOGUILOCK
         )
         with gui_lock:
+            self.__make_sure_pyautogui_lock_is_writable()
             for key in keys:
                 pyautogui.press(key)
-                time.sleep(0.0375)
+                time.sleep(0.044)
         self.__slow_mode_pause_if_set()
         self.loop.run_until_complete(self.page.wait())
 
@@ -1143,6 +1275,7 @@ class CDPMethods():
             constants.MultiBrowser.PYAUTOGUILOCK
         )
         with gui_lock:
+            self.__make_sure_pyautogui_lock_is_writable()
             pyautogui.write(text)
         self.__slow_mode_pause_if_set()
         self.loop.run_until_complete(self.page.wait())
@@ -1163,6 +1296,7 @@ class CDPMethods():
                 constants.MultiBrowser.PYAUTOGUILOCK
             )
             with gui_lock:  # Prevent issues with multiple processes
+                self.__make_sure_pyautogui_lock_is_writable()
                 pyautogui.moveTo(x, y, timeframe, pyautogui.easeOutQuad)
                 if timeframe >= 0.25:
                     time.sleep(0.056)  # Wait if moving at human-speed
@@ -1183,6 +1317,7 @@ class CDPMethods():
             constants.MultiBrowser.PYAUTOGUILOCK
         )
         with gui_lock:  # Prevent issues with multiple processes
+            self.__make_sure_pyautogui_lock_is_writable()
             self.__install_pyautogui_if_missing()
             import pyautogui
             pyautogui = self.__get_configured_pyautogui(pyautogui)
@@ -1400,6 +1535,7 @@ class CDPMethods():
             constants.MultiBrowser.PYAUTOGUILOCK
         )
         with gui_lock:
+            self.__make_sure_pyautogui_lock_is_writable()
             self.bring_active_window_to_front()
             self.gui_hover_element(hover_selector)
             time.sleep(0.15)
@@ -1472,25 +1608,53 @@ class CDPMethods():
                 return True
             return False
 
-    def assert_element(self, selector, timeout=settings.SMALL_TIMEOUT):
+    def wait_for_element_visible(
+        self, selector, timeout=settings.SMALL_TIMEOUT
+    ):
         try:
             self.select(selector, timeout=timeout)
         except Exception:
-            raise Exception("Element {%s} not found!" % selector)
+            raise Exception("Element {%s} was not found!" % selector)
+        for i in range(30):
+            if self.is_element_visible(selector):
+                return self.select(selector)
+            time.sleep(0.1)
+        raise Exception("Element {%s} was not visible!" % selector)
+
+    def assert_element(self, selector, timeout=settings.SMALL_TIMEOUT):
+        """Same as assert_element_visible()"""
+        try:
+            self.select(selector, timeout=timeout)
+        except Exception:
+            raise Exception("Element {%s} was not found!" % selector)
         for i in range(30):
             if self.is_element_visible(selector):
                 return True
             time.sleep(0.1)
-        raise Exception("Element {%s} not visible!" % selector)
+        raise Exception("Element {%s} was not visible!" % selector)
 
-    def assert_element_present(self, selector, timeout=settings.SMALL_TIMEOUT):
+    def assert_element_visible(self, selector, timeout=settings.SMALL_TIMEOUT):
+        """Same as assert_element()"""
         try:
             self.select(selector, timeout=timeout)
         except Exception:
-            raise Exception("Element {%s} not found!" % selector)
+            raise Exception("Element {%s} was not found!" % selector)
+        for i in range(30):
+            if self.is_element_visible(selector):
+                return True
+            time.sleep(0.1)
+        raise Exception("Element {%s} was not visible!" % selector)
+
+    def assert_element_present(self, selector, timeout=settings.SMALL_TIMEOUT):
+        """Assert element is present in the DOM. (Visibility NOT required)"""
+        try:
+            self.select(selector, timeout=timeout)
+        except Exception:
+            raise Exception("Element {%s} was not found!" % selector)
         return True
 
     def assert_element_absent(self, selector, timeout=settings.SMALL_TIMEOUT):
+        """Assert element is not present in the DOM."""
         start_ms = time.time() * 1000.0
         stop_ms = start_ms + (timeout * 1000.0)
         for i in range(int(timeout * 10)):
@@ -1511,6 +1675,7 @@ class CDPMethods():
     def assert_element_not_visible(
         self, selector, timeout=settings.SMALL_TIMEOUT
     ):
+        """Assert element is not visible on page. (May still be in DOM)"""
         start_ms = time.time() * 1000.0
         stop_ms = start_ms + (timeout * 1000.0)
         for i in range(int(timeout * 10)):
@@ -1530,6 +1695,21 @@ class CDPMethods():
             % (selector, timeout, plural)
         )
 
+    def assert_element_attribute(self, selector, attribute, value=None):
+        attributes = self.get_element_attributes(selector)
+        if attribute not in attributes:
+            raise Exception(
+                "Attribute {%s} was not found in element {%s}!"
+                % (attribute, selector)
+            )
+        if value and attributes[attribute] != value:
+            raise Exception(
+                "Expected value {%s} of attribute {%s} "
+                "was not found in element {%s}! "
+                "(Actual value was {%s})"
+                % (value, attribute, selector, attributes[attribute])
+            )
+
     def assert_title(self, title):
         expected = title.strip()
         actual = self.get_title().strip()
@@ -1541,23 +1721,74 @@ class CDPMethods():
                 raise Exception(error % (expected, actual))
         except Exception:
             time.sleep(2)
-            expected = title.strip()
             actual = self.get_title().strip()
             if expected != actual:
                 raise Exception(error % (expected, actual))
 
+    def assert_title_contains(self, substring):
+        expected = substring.strip()
+        actual = self.get_title().strip()
+        error = (
+            "Expected title substring [%s] does not appear "
+            "in the actual page title [%s]!"
+        )
+        try:
+            if expected not in actual:
+                raise Exception(error % (expected, actual))
+        except Exception:
+            time.sleep(2)
+            actual = self.get_title().strip()
+            if expected not in actual:
+                raise Exception(error % (expected, actual))
+
+    def assert_url(self, url):
+        expected = url.strip()
+        actual = self.get_current_url().strip()
+        error = "Expected URL [%s] does not match the actual URL [%s]!"
+        try:
+            if expected != actual:
+                raise Exception(error % (expected, actual))
+        except Exception:
+            time.sleep(2)
+            actual = self.get_current_url().strip()
+            if expected != actual:
+                raise Exception(error % (expected, actual))
+
+    def assert_url_contains(self, substring):
+        expected = substring.strip()
+        actual = self.get_current_url().strip()
+        error = (
+            "Expected URL substring [%s] does not appear "
+            "in the full URL [%s]!"
+        )
+        try:
+            if expected not in actual:
+                raise Exception(error % (expected, actual))
+        except Exception:
+            time.sleep(2)
+            actual = self.get_current_url().strip()
+            if expected not in actual:
+                raise Exception(error % (expected, actual))
+
     def assert_text(
-        self, text, selector="html", timeout=settings.SMALL_TIMEOUT
+        self, text, selector="body", timeout=settings.SMALL_TIMEOUT
     ):
+        start_ms = time.time() * 1000.0
+        stop_ms = start_ms + (timeout * 1000.0)
         text = text.strip()
         element = None
         try:
-            element = self.select(selector, timeout=timeout)
+            element = self.find_element(selector, timeout=timeout)
         except Exception:
             raise Exception("Element {%s} not found!" % selector)
-        for i in range(30):
-            if self.is_element_visible(selector) and text in element.text_all:
+        for i in range(int(timeout * 10)):
+            with suppress(Exception):
+                element = self.find_element(selector, timeout=0.1)
+            if text in element.text_all:
                 return True
+            now_ms = time.time() * 1000.0
+            if now_ms >= stop_ms:
+                break
             time.sleep(0.1)
         raise Exception(
             "Text {%s} not found in {%s}! Actual text: {%s}"
@@ -1565,25 +1796,56 @@ class CDPMethods():
         )
 
     def assert_exact_text(
-        self, text, selector="html", timeout=settings.SMALL_TIMEOUT
+        self, text, selector="body", timeout=settings.SMALL_TIMEOUT
     ):
+        start_ms = time.time() * 1000.0
+        stop_ms = start_ms + (timeout * 1000.0)
         text = text.strip()
         element = None
         try:
             element = self.select(selector, timeout=timeout)
         except Exception:
             raise Exception("Element {%s} not found!" % selector)
-        for i in range(30):
+        for i in range(int(timeout * 10)):
+            with suppress(Exception):
+                element = self.select(selector, timeout=0.1)
             if (
                 self.is_element_visible(selector)
                 and text.strip() == element.text_all.strip()
             ):
                 return True
+            now_ms = time.time() * 1000.0
+            if now_ms >= stop_ms:
+                break
             time.sleep(0.1)
         raise Exception(
             "Expected Text {%s}, is not equal to {%s} in {%s}!"
             % (text, element.text_all, selector)
         )
+
+    def assert_true(self, expression):
+        if not expression:
+            raise AssertionError("%s is not true" % expression)
+
+    def assert_false(self, expression):
+        if expression:
+            raise AssertionError("%s is not false" % expression)
+
+    def assert_equal(self, first, second):
+        if first != second:
+            raise AssertionError("%s is not equal to %s" % (first, second))
+
+    def assert_not_equal(self, first, second):
+        if first == second:
+            raise AssertionError("%s is equal to %s" % (first, second))
+
+    def assert_in(self, first, second):
+        if first not in second:
+            raise AssertionError("%s is not in %s" % (first, second))
+
+    def assert_not_in(self, first, second):
+        if first in second:
+            raise AssertionError("%s is in %s" % (first, second))
 
     def scroll_into_view(self, selector):
         self.find_element(selector).scroll_into_view()

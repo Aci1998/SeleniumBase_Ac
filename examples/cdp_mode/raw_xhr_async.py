@@ -1,10 +1,11 @@
 """CDP.network.ResponseReceived with CDP.network.ResourceType.XHR."""
 import ast
+import asyncio
 import colorama
 import mycdp
 import sys
 import time
-from seleniumbase import SB
+from seleniumbase.undetected import cdp_driver
 
 xhr_requests = []
 last_xhr_request = None
@@ -56,19 +57,19 @@ async def receiveXHR(page, requests):
     return responses
 
 
-with SB(uc=True, test=True, locale_code="en") as sb:
-    sb.activate_cdp_mode("about:blank")
-    tab = sb.cdp.page
+async def crawl():
+    driver = await cdp_driver.cdp_util.start_async()
+    tab = await driver.get("about:blank")
     listenXHR(tab)
 
     # Change url to something that makes ajax requests
-    sb.cdp.open("https://learn.microsoft.com/en-us/")
+    tab = await driver.get("https://learn.microsoft.com/en-us/")
     time.sleep(2)
-    for i in range(15):
-        sb.cdp.scroll_down(15)
+    for i in range(75):
+        await tab.scroll_down(3)
+        time.sleep(0.02)
 
-    loop = sb.cdp.get_event_loop()
-    xhr_responses = loop.run_until_complete(receiveXHR(tab, xhr_requests))
+    xhr_responses = await receiveXHR(tab, xhr_requests)
     for response in xhr_responses:
         print(c1 + "*** ==> XHR Request URL <== ***" + cr)
         print(f'{response["url"]}')
@@ -82,3 +83,10 @@ with SB(uc=True, test=True, locale_code="en") as sb:
             response_body = response["body"]
             print(c2 + "*** ==> XHR Response Body <== ***" + cr)
             print(response_body if not is_base64 else b64_data)
+
+
+if __name__ == "__main__":
+    print("<============= START: XHR Example =============>")
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(crawl())
+    print("<============== END: XHR Example ==============>")
