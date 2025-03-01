@@ -60,21 +60,76 @@
 
 📚 Learn from [**over 200 examples** in the **SeleniumBase/examples/** folder](https://github.com/seleniumbase/SeleniumBase/tree/master/examples).
 
-👤 Note that <span translate="no">SeleniumBase</span> <a translate="no" href="https://github.com/seleniumbase/SeleniumBase/blob/master/help_docs/uc_mode.md"><b>UC Mode</b> (Stealth Mode) has its own ReadMe</a>.
+🐙 Note that <a translate="no" href="https://github.com/seleniumbase/SeleniumBase/blob/master/help_docs/uc_mode.md"><b>UC Mode</b></a> / <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/cdp_mode/ReadMe.md"><b>CDP Mode</b></a> (Stealth Mode) have their own ReadMe files.
 
-🐙 Also note that Seleniumbase <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/cdp_mode/ReadMe.md"><b>CDP Mode</b> has its own separate ReadMe</a>.
+ℹ️ Most scripts run with raw <code translate="no"><b>python</b></code>, although some scripts use <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/help_docs/syntax_formats.md">Syntax Formats</a> that expect <a href="https://docs.pytest.org/en/latest/how-to/usage.html" translate="no"><b>pytest</b></a> (a Python unit-testing framework included with SeleniumBase that can discover, collect, and run tests automatically).
 
-ℹ️ Scripts can be called via <code translate="no"><b>python</b></code>, although some <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/help_docs/syntax_formats.md">Syntax Formats</a> expect <a href="https://docs.pytest.org/en/latest/how-to/usage.html" translate="no"><b>pytest</b></a> (a Python unit-testing framework included with SeleniumBase that can discover, collect, and run tests automatically).
+--------
 
-<p align="left">📗 Here's <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/my_first_test.py">my_first_test.py</a>, which tests login, shopping, and checkout:</p>
+<p align="left">📗 Here's <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/raw_google.py">raw_google.py</a>, which performs a Google search:</p>
 
-```bash
-pytest my_first_test.py
+```python
+from seleniumbase import SB
+
+with SB(test=True, uc=True) as sb:
+    sb.open("https://google.com/ncr")
+    sb.type('[title="Search"]', "SeleniumBase GitHub page\n")
+    sb.click('[href*="github.com/seleniumbase/"]')
+    sb.save_screenshot_to_logs()  # ./latest_logs/
+    print(sb.get_page_title())
 ```
 
-<a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/my_first_test.py"><img src="https://seleniumbase.github.io/cdn/gif/fast_swag_2.gif" alt="SeleniumBase Test" title="SeleniumBase Test" width="520" /></a>
+> `python raw_google.py`
 
-> ``pytest`` uses ``--chrome`` by default unless set differently.
+<a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/raw_google.py"><img src="https://seleniumbase.github.io/cdn/gif/google_search.gif" alt="SeleniumBase Test" title="SeleniumBase Test" width="420" /></a>
+
+--------
+
+<p align="left">📗 Here's an example of bypassing Cloudflare's challenge page: <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/cdp_mode/raw_gitlab.py">SeleniumBase/examples/cdp_mode/raw_gitlab.py</a></p>
+
+```python
+from seleniumbase import SB
+
+with SB(uc=True, test=True, locale="en") as sb:
+    url = "https://gitlab.com/users/sign_in"
+    sb.activate_cdp_mode(url)
+    sb.uc_gui_click_captcha()
+    sb.sleep(2)
+```
+
+<img src="https://seleniumbase.github.io/other/cf_sec.jpg" title="SeleniumBase" width="332"> <img src="https://seleniumbase.github.io/other/gitlab_bypass.png" title="SeleniumBase" width="288">
+
+--------
+
+<p align="left">📗 Here's <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/test_get_swag.py">test_get_swag.py</a>, which tests an e-commerce site:</p>
+
+```python
+from seleniumbase import BaseCase
+BaseCase.main(__name__, __file__)  # Call pytest
+
+class MyTestClass(BaseCase):
+    def test_swag_labs(self):
+        self.open("https://www.saucedemo.com")
+        self.type("#user-name", "standard_user")
+        self.type("#password", "secret_sauce\n")
+        self.assert_element("div.inventory_list")
+        self.click('button[name*="backpack"]')
+        self.click("#shopping_cart_container a")
+        self.assert_text("Backpack", "div.cart_item")
+        self.click("button#checkout")
+        self.type("input#first-name", "SeleniumBase")
+        self.type("input#last-name", "Automation")
+        self.type("input#postal-code", "77123")
+        self.click("input#continue")
+        self.click("button#finish")
+        self.assert_text("Thank you for your order!")
+```
+
+> `pytest test_get_swag.py`
+
+<a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/test_get_swag.py"><img src="https://seleniumbase.github.io/cdn/gif/fast_swag_2.gif" alt="SeleniumBase Test" title="SeleniumBase Test" width="480" /></a>
+
+> (The default browser is ``--chrome`` if not set.)
 
 --------
 
@@ -84,7 +139,7 @@ pytest my_first_test.py
 pytest test_coffee_cart.py --demo
 ```
 
-<p align="left"><a href="https://seleniumbase.io/coffee/" target="_blank"><img src="https://seleniumbase.github.io/cdn/gif/coffee_cart.gif" width="520" alt="SeleniumBase Coffee Cart Test" title="SeleniumBase Coffee Cart Test" /></a></p>
+<p align="left"><a href="https://seleniumbase.io/coffee/" target="_blank"><img src="https://seleniumbase.github.io/cdn/gif/coffee_cart.gif" width="480" alt="SeleniumBase Coffee Cart Test" title="SeleniumBase Coffee Cart Test" /></a></p>
 
 > <p>(<code translate="no">--demo</code> mode slows down tests and highlights actions)</p>
 
@@ -98,7 +153,7 @@ pytest test_coffee_cart.py --demo
 pytest test_demo_site.py
 ```
 
-<p align="left"><a href="https://seleniumbase.io/demo_page" target="_blank"><img src="https://seleniumbase.github.io/cdn/gif/demo_page_5.gif" width="520" alt="SeleniumBase Example" title="SeleniumBase Example" /></a></p>
+<p align="left"><a href="https://seleniumbase.io/demo_page" target="_blank"><img src="https://seleniumbase.github.io/cdn/gif/demo_page_5.gif" width="480" alt="SeleniumBase Example" title="SeleniumBase Example" /></a></p>
 
 > Easy to type, click, select, toggle, drag & drop, and more.
 
@@ -168,7 +223,7 @@ With raw Selenium, that requires more code:<br />
 
 <p>📚 <b>Learn about different ways of writing tests:</b></p>
 
-<p align="left">📘📝 Here's <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/test_simple_login.py">test_simple_login.py</a>, which uses <code translate="no"><a href="https://github.com/seleniumbase/SeleniumBase/blob/master/seleniumbase/fixtures/base_case.py">BaseCase</a></code> class inheritance, and runs with <a href="https://docs.pytest.org/en/latest/how-to/usage.html">pytest</a> or <a href="https://github.com/mdmintz/pynose">pynose</a>. (Use <code translate="no">self.driver</code> to access Selenium's raw <code translate="no">driver</code>.)</p>
+<p align="left">📗📝 Here's <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/test_simple_login.py">test_simple_login.py</a>, which uses <code translate="no"><a href="https://github.com/seleniumbase/SeleniumBase/blob/master/seleniumbase/fixtures/base_case.py">BaseCase</a></code> class inheritance, and runs with <a href="https://docs.pytest.org/en/latest/how-to/usage.html">pytest</a> or <a href="https://github.com/mdmintz/pynose">pynose</a>. (Use <code translate="no">self.driver</code> to access Selenium's raw <code translate="no">driver</code>.)</p>
 
 ```python
 from seleniumbase import BaseCase
@@ -187,22 +242,7 @@ class TestSimpleLogin(BaseCase):
         self.assert_text("signed out", "#top_message")
 ```
 
-<p align="left">📗📝 Here's a test from <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/sb_fixture_tests.py">sb_fixture_tests.py</a>, which uses the <b><code translate="no">sb</code></b> <code translate="no">pytest</code> fixture. Runs with <a href="https://docs.pytest.org/en/latest/how-to/usage.html">pytest</a>. (Use <code translate="no">sb.driver</code> to access Selenium's raw <code translate="no">driver</code>.)</p>
-
-```python
-def test_sb_fixture_with_no_class(sb):
-    sb.open("seleniumbase.io/simple/login")
-    sb.type("#username", "demo_user")
-    sb.type("#password", "secret_pass")
-    sb.click('a:contains("Sign in")')
-    sb.assert_exact_text("Welcome!", "h1")
-    sb.assert_element("img#image1")
-    sb.highlight("#image1")
-    sb.click_link("Sign out")
-    sb.assert_text("signed out", "#top_message")
-```
-
-<p align="left">📙📝 Here's <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/raw_login_sb.py">raw_login_sb.py</a>, which uses the <b><code translate="no">SB</code></b> Context Manager. Runs with pure <code translate="no">python</code>. (Use <code translate="no">sb.driver</code> to access Selenium's raw <code translate="no">driver</code>.)</p>
+<p align="left">📘📝 Here's <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/raw_login_sb.py">raw_login_sb.py</a>, which uses the <b><code translate="no">SB</code></b> Context Manager. Runs with pure <code translate="no">python</code>. (Use <code translate="no">sb.driver</code> to access Selenium's raw <code translate="no">driver</code>.)</p>
 
 ```python
 from seleniumbase import SB
@@ -219,24 +259,7 @@ with SB() as sb:
     sb.assert_text("signed out", "#top_message")
 ```
 
-<p align="left">📔📝 Here's <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/raw_login_context.py">raw_login_context.py</a>, which uses the <b><code translate="no">DriverContext</code></b> Manager. Runs with pure <code translate="no">python</code>. (The <code translate="no">driver</code> is an improved version of Selenium's raw <code translate="no">driver</code>, with more methods.)</p>
-
-```python
-from seleniumbase import DriverContext
-
-with DriverContext() as driver:
-    driver.open("seleniumbase.io/simple/login")
-    driver.type("#username", "demo_user")
-    driver.type("#password", "secret_pass")
-    driver.click('a:contains("Sign in")')
-    driver.assert_exact_text("Welcome!", "h1")
-    driver.assert_element("img#image1")
-    driver.highlight("#image1")
-    driver.click_link("Sign out")
-    driver.assert_text("signed out", "#top_message")
-```
-
-<p align="left">📔📝 Here's <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/raw_login_driver.py">raw_login_driver.py</a>, which uses the <b><code translate="no">Driver</code></b> Manager. Runs with pure <code translate="no">python</code>. (The <code>driver</code> is an improved version of Selenium's raw <code translate="no">driver</code>, with more methods.)</p>
+<p align="left">📙📝 Here's <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/raw_login_driver.py">raw_login_driver.py</a>, which uses the <b><code translate="no">Driver</code></b> Manager. Runs with pure <code translate="no">python</code>. (The <code>driver</code> is an improved version of Selenium's raw <code translate="no">driver</code>, with more methods.)</p>
 
 ```python
 from seleniumbase import Driver
@@ -254,23 +277,6 @@ try:
     driver.assert_text("signed out", "#top_message")
 finally:
     driver.quit()
-```
-
-<p align="left">📕📝 Here's <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/behave_bdd/features/login_app.feature">login_app.feature</a>, which uses <a translate="no" href="https://behave.readthedocs.io/en/stable/gherkin.html#features" target="_blank">behave-BDD Gherkin</a> syntax. Runs with <code translate="no">behave</code>. (<a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/behave_bdd/ReadMe.md">Learn about the <b>SeleniumBase behave-BDD</b> integration</a>)</p>
-
-```gherkin
-Feature: SeleniumBase scenarios for the Simple App
-
-  Scenario: Verify the Simple App (Login / Logout)
-    Given Open "seleniumbase.io/simple/login"
-    And Type "demo_user" into "#username"
-    And Type "secret_pass" into "#password"
-    And Click 'a:contains("Sign in")'
-    And Assert exact text "Welcome!" in "h1"
-    And Assert element "img#image1"
-    And Highlight "#image1"
-    And Click link "Sign out"
-    And Assert text "signed out" in "#top_message"
 ```
 
 --------
@@ -371,20 +377,21 @@ pip install -e .
 <summary> ▶️ Here's sample output from a chromedriver download. (<b>click to expand</b>)</summary>
 
 ```bash
-*** chromedriver to download = 121.0.6167.85 (Latest Stable) 
+*** chromedriver to download = 131.0.6778.108 (Latest Stable) 
 
 Downloading chromedriver-mac-arm64.zip from:
-https://storage.googleapis.com/chrome-for-testing-public/121.0.6167.85/mac-arm64/chromedriver-mac-arm64.zip ...
+https://storage.googleapis.com/chrome-for-testing-public/131.0.6778.108/mac-arm64/chromedriver-mac-arm64.zip ...
 Download Complete!
 
 Extracting ['chromedriver'] from chromedriver-mac-arm64.zip ...
 Unzip Complete!
 
 The file [chromedriver] was saved to:
-/Users/michael/github/SeleniumBase/seleniumbase/drivers/chromedriver
+~/github/SeleniumBase/seleniumbase/drivers/
+chromedriver
 
-Making [chromedriver 121.0.6167.85] executable ...
-[chromedriver 121.0.6167.85] is now ready for use!
+Making [chromedriver 131.0.6778.108] executable ...
+[chromedriver 131.0.6778.108] is now ready for use!
 ```
 
 </details>
@@ -402,9 +409,9 @@ cd examples/
 pytest my_first_test.py
 ```
 
-<a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/my_first_test.py"><img src="https://seleniumbase.github.io/cdn/gif/fast_swag_2.gif" alt="SeleniumBase Test" title="SeleniumBase Test" width="520" /></a>
+<a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/my_first_test.py"><img src="https://seleniumbase.github.io/cdn/gif/fast_swag_2.gif" alt="SeleniumBase Test" title="SeleniumBase Test" width="480" /></a>
 
-<p align="left"><b>Here's the code for <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/my_first_test.py">my_first_test.py</a>:</b></p>
+<p align="left"><b>Here's the full code for <a href="https://github.com/seleniumbase/SeleniumBase/blob/master/examples/my_first_test.py">my_first_test.py</a>:</b></p>
 
 ```python
 from seleniumbase import BaseCase
@@ -820,7 +827,7 @@ You can run it from the ``examples/`` folder like this:
 pytest test_fail.py
 ```
 
-🔵 You'll notice that a logs folder, "latest_logs", was created to hold information about the failing test, and screenshots. During test runs, past results get moved to the archived_logs folder if you have ARCHIVE_EXISTING_LOGS set to True in [settings.py](https://github.com/seleniumbase/SeleniumBase/blob/master/seleniumbase/config/settings.py), or if your run tests with ``--archive-logs``. If you choose not to archive existing logs, they will be deleted and replaced by the logs of the latest test run.
+🔵 You'll notice that a logs folder, ``./latest_logs/``, was created to hold information (and screenshots) about the failing test. During test runs, past results get moved to the archived_logs folder if you have ARCHIVE_EXISTING_LOGS set to True in [settings.py](https://github.com/seleniumbase/SeleniumBase/blob/master/seleniumbase/config/settings.py), or if your run tests with ``--archive-logs``. If you choose not to archive existing logs, they will be deleted and replaced by the logs of the latest test run.
 
 --------
 

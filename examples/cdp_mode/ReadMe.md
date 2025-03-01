@@ -2,18 +2,28 @@
 
 ## [<img src="https://seleniumbase.github.io/img/logo6.png" title="SeleniumBase" width="32">](https://github.com/seleniumbase/SeleniumBase/) CDP Mode 🐙
 
-🐙 <b translate="no">SeleniumBase</b> <b translate="no">CDP Mode</b> (Chrome Devtools Protocol Mode) is a special mode inside of <b><a href="https://github.com/seleniumbase/SeleniumBase/blob/master/help_docs/uc_mode.md" translate="no"><span translate="no">SeleniumBase UC Mode</span></a></b> that lets bots appear human while controlling the browser with the <b translate="no">CDP-Driver</b>. Although regular <span translate="no">UC Mode</span> can't perform <span translate="no">WebDriver</span> actions while the <code>driver</code> is disconnected from the browser, the <span translate="no">CDP-Driver</span> can still perform actions while maintaining its cover.
+🐙 <b translate="no">SeleniumBase</b> <b translate="no">CDP Mode</b> (Chrome Devtools Protocol Mode) is a special mode inside of <b><a href="https://github.com/seleniumbase/SeleniumBase/blob/master/help_docs/uc_mode.md" translate="no"><span translate="no">SeleniumBase UC Mode</span></a></b> that lets bots appear human while controlling the browser with the <b translate="no">CDP-Driver</b>. Although regular <b translate="no">UC Mode</b> can't perform <span translate="no">WebDriver</span> actions while the <code>driver</code> is disconnected from the browser, the <b translate="no">CDP-Driver</b> can.
 
 --------
 
-<!-- YouTube View --><a href="https://www.youtube.com/watch?v=Mr90iQmNsKM"><img src="http://img.youtube.com/vi/Mr90iQmNsKM/0.jpg" title="SeleniumBase on YouTube" width="366" /></a>
+<!-- YouTube View --><a href="https://www.youtube.com/watch?v=Mr90iQmNsKM"><img src="https://github.com/user-attachments/assets/91e7ff7b-d155-4ba9-b17b-b097825fcf42" title="SeleniumBase on YouTube" width="320" /></a>
 <p>(<b><a href="https://www.youtube.com/watch?v=Mr90iQmNsKM">Watch the CDP Mode tutorial on YouTube! ▶️</a></b>)</p>
+
+--------
+
+<!-- YouTube View --><a href="https://www.youtube.com/watch?v=vt2zsdiNh3U"><img src="https://github.com/user-attachments/assets/82ab2715-727e-4d09-9314-b8905795dc43" title="SeleniumBase on YouTube" width="320" /></a>
+<p>(<b><a href="https://www.youtube.com/watch?v=vt2zsdiNh3U">Watch "Hacking websites with CDP" on YouTube! ▶️</a></b>)</p>
+
+--------
+
+<!-- YouTube View --><a href="https://www.youtube.com/watch?v=gEZhTfaIxHQ"><img src="https://github.com/user-attachments/assets/656977e1-5d66-4d1c-9eec-0aaa41f6522f" title="SeleniumBase on YouTube" width="320" /></a>
+<p>(<b><a href="https://www.youtube.com/watch?v=gEZhTfaIxHQ">Watch "Web-Scraping with GitHub Actions" on YouTube! ▶️</a></b>)</p>
 
 --------
 
 👤 <b translate="no">UC Mode</b> avoids bot-detection by first disconnecting WebDriver from the browser at strategic times, calling special <code>PyAutoGUI</code> methods to bypass CAPTCHAs (as needed), and finally reconnecting the <code>driver</code> afterwards so that WebDriver actions can be performed again. Although this approach works for bypassing simple CAPTCHAs, more flexibility is needed for bypassing bot-detection on websites with advanced protection. (That's where <b translate="no">CDP Mode</b> comes in.)
 
-🐙 <b translate="no">CDP Mode</b> is based on <a href="https://github.com/HyperionGray/python-chrome-devtools-protocol" translate="no">python-cdp</a>, <a href="https://github.com/HyperionGray/trio-chrome-devtools-protocol" translate="no">trio-cdp</a>, and <a href="https://github.com/ultrafunkamsterdam/nodriver" translate="no">nodriver</a>. <code>trio-cdp</code> is an early implementation of <code>python-cdp</code>, and <code>nodriver</code> is a modern implementation of <code>python-cdp</code>. (Refactored Python-CDP code is imported from <a href="https://github.com/mdmintz/MyCDP" translate="no">MyCDP</a>.)
+🐙 <b translate="no">CDP Mode</b> is based on <a href="https://github.com/HyperionGray/python-chrome-devtools-protocol" translate="no">python-cdp</a>, <a href="https://github.com/HyperionGray/trio-chrome-devtools-protocol" translate="no">trio-cdp</a>, and <a href="https://github.com/ultrafunkamsterdam/nodriver" translate="no">nodriver</a>. <code>trio-cdp</code> is an early implementation of <code>python-cdp</code>, and <code>nodriver</code> is a modern implementation of <code>python-cdp</code>. (Refactored <code>Python-CDP</code> code is imported from <a href="https://github.com/mdmintz/MyCDP" translate="no">MyCDP</a>.)
 
 🐙 <b translate="no">CDP Mode</b> includes multiple updates to the above, such as:
 
@@ -35,17 +45,59 @@
 
 That disconnects WebDriver from Chrome (which prevents detection), and gives you access to `sb.cdp` methods (which don't trigger anti-bot checks).
 
+Simple example: ([SeleniumBase/examples/cdp_mode/raw_gitlab.py](https://github.com/seleniumbase/SeleniumBase/blob/master/examples/cdp_mode/raw_gitlab.py))
+
+```python
+from seleniumbase import SB
+
+with SB(uc=True, test=True, locale="en") as sb:
+    url = "https://gitlab.com/users/sign_in"
+    sb.activate_cdp_mode(url)
+    sb.uc_gui_click_captcha()
+    sb.sleep(2)
+```
+
+<img src="https://seleniumbase.github.io/other/cf_sec.jpg" title="SeleniumBase" width="332"> <img src="https://seleniumbase.github.io/other/gitlab_bypass.png" title="SeleniumBase" width="288">
+
+(If the CAPTCHA wasn't bypassed automatically, then `sb.uc_gui_click_captcha()` gets the job done.)
+
+Note that `PyAutoGUI` is an optional dependency. If calling a method that uses it when not already installed, then `SeleniumBase` installs `PyAutoGUI` at run-time.
+
+--------
+
+For Cloudflare CAPTCHAs that appear as part of a websites, you may need to use `sb.cdp.gui_click_element(selector)` instead (if the Turnstile wasn't bypassed automatically). Example: ([SeleniumBase/examples/cdp_mode/raw_planetmc.py](https://github.com/seleniumbase/SeleniumBase/blob/master/examples/cdp_mode/raw_planetmc.py))
+
+```python
+from seleniumbase import SB
+
+with SB(uc=True, test=True) as sb:
+    url = "www.planetminecraft.com/account/sign_in/"
+    sb.activate_cdp_mode(url)
+    sb.sleep(2)
+    sb.cdp.gui_click_element("#turnstile-widget div")
+    sb.sleep(2)
+```
+
+<img src="https://seleniumbase.github.io/other/planet_mc.png" title="SeleniumBase" width="480">
+
+When using `sb.cdp.gui_click_element(selector)` on CF Turnstiles, use the parent `selector` that appears **above** the `#shadow-root` element:
+Eg. `sb.cdp.gui_click_element("#turnstile-widget div")`
+
+<img src="https://seleniumbase.github.io/other/above_shadow.png" title="SeleniumBase" width="480">
+
+--------
+
 ### 🐙 Here are a few common `sb.cdp` methods:
 
-* `sb.cdp.click(selector)`
+* `sb.cdp.click(selector)`  (Uses the CDP API to click)
 * `sb.cdp.click_if_visible(selector)`
-* `sb.cdp.gui_click_element(selector)`
+* `sb.cdp.gui_click_element(selector)`  (Uses `PyAutoGUI`)
 * `sb.cdp.type(selector, text)`
-* `sb.cdp.press_keys(selector, text)`
+* `sb.cdp.press_keys(selector, text)`  (Human-speed `type`)
 * `sb.cdp.select_all(selector)`
 * `sb.cdp.get_text(selector)`
 
-When `type()` is too fast, use the slower `press_keys()` to avoid detection. You can also use `sb.sleep(seconds)` to slow things down. Methods that start with `sb.cdp.gui` use `PyAutoGUI` for interaction.
+Methods that start with `sb.cdp.gui` use `PyAutoGUI` for interaction.
 
 To use WebDriver methods again, call:
 
@@ -57,15 +109,17 @@ To disconnect again, call:
 
 * **`sb.disconnect()`**
 
-While disconnected, if you accidentally call a WebDriver method, then SeleniumBase will attempt to use the CDP Mode version of that method (if available). For example, if you accidentally call `sb.click(selector)` instead of `sb.cdp.click(selector)`, then your WebDriver call will automatically be redirected to the CDP Mode version. Not all WebDriver methods have a matching CDP Mode method. In that scenario, calling a WebDriver method while disconnected could raise an error, or make WebDriver automatically reconnect first.
+While disconnected, if you accidentally call a WebDriver method, then <b translate="no">SeleniumBase</b> will attempt to use the <b translate="no">CDP Mode</b> version of that method (if available). For example, if you accidentally call `sb.click(selector)` instead of `sb.cdp.click(selector)`, then your WebDriver call will automatically be redirected to the <b translate="no">CDP Mode</b> version. Not all WebDriver methods have a matching <b translate="no">CDP Mode</b> method. In that scenario, calling a WebDriver method while disconnected could raise an error, or make WebDriver automatically reconnect first.
 
 To find out if WebDriver is connected or disconnected, call:
 
 * **`sb.is_connected()`**
 
+<b>Note:</b> When <b translate="no">CDP Mode</b> is initialized from <b translate="no">UC Mode</b>, the WebDriver is disconnected from the browser. (The stealthy <b translate="no">CDP-Driver</b> takes over.)
+
 --------
 
-### 🐙 <b translate="no">CDP Mode</b> Examples ([SeleniumBase/examples/cdp_mode](https://github.com/seleniumbase/SeleniumBase/tree/master/examples/cdp_mode))
+### 🐙 <b translate="no">CDP Mode</b> examples ([SeleniumBase/examples/cdp_mode](https://github.com/seleniumbase/SeleniumBase/tree/master/examples/cdp_mode))
 
 <p><div /></p>
 
@@ -76,7 +130,7 @@ To find out if WebDriver is connected or disconnected, call:
 ```python
 from seleniumbase import SB
 
-with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+with SB(uc=True, test=True, locale="en", ad_block=True) as sb:
     url = "https://www.pokemon.com/us"
     sb.activate_cdp_mode(url)
     sb.sleep(3.2)
@@ -90,7 +144,7 @@ with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
     sb.sleep(0.5)
     sb.scroll_into_view("a#advSearch")
     sb.sleep(0.5)
-    sb.cdp.mouse_click("a#advSearch")
+    sb.cdp.click("a#advSearch")
     sb.sleep(1.2)
     sb.cdp.click('img[src*="img/pokedex/detail/025.png"]')
     sb.cdp.assert_text("Pikachu", 'div[class*="title"]')
@@ -135,7 +189,7 @@ with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
 ```python
 from seleniumbase import SB
 
-with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+with SB(uc=True, test=True, locale="en", ad_block=True) as sb:
     url = "https://www.hyatt.com/"
     sb.activate_cdp_mode(url)
     sb.sleep(2.5)
@@ -182,11 +236,11 @@ with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
 ```python
 from seleniumbase import SB
 
-with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+with SB(uc=True, test=True, locale="en", ad_block=True) as sb:
     url = "https://www.bestwestern.com/en_US.html"
     sb.activate_cdp_mode(url)
     sb.sleep(2.5)
-    sb.cdp.click_if_visible("div.onetrust-close-btn-handler")
+    sb.cdp.click_if_visible(".onetrust-close-btn-handler")
     sb.sleep(1)
     sb.cdp.click("input#destination-input")
     sb.sleep(2)
@@ -201,7 +255,9 @@ with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
     sb.sleep(2.5)
     print("Best Western Hotels in %s:" % location)
     summary_details = sb.cdp.get_text("#summary-details-column")
-    dates = summary_details.split("ROOM")[0].split("DATES")[-1].strip()
+    dates = summary_details.split("DESTINATION")[-1]
+    dates = dates.split(" CHECK-OUT")[0].strip() + " CHECK-OUT"
+    dates = dates.replace("  ", " ")
     print("(Dates: %s)" % dates)
     flip_cards = sb.cdp.select_all(".flipCard")
     for i, flip_card in enumerate(flip_cards):
@@ -225,16 +281,18 @@ with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
 ```python
 from seleniumbase import SB
 
-with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+with SB(uc=True, test=True, ad_block=True) as sb:
     url = "https://www.walmart.com/"
     sb.activate_cdp_mode(url)
     sb.sleep(2.5)
+    sb.cdp.click_if_visible('[data-automation-id*="close-mark"]')
     sb.cdp.mouse_click('input[aria-label="Search"]')
     sb.sleep(1.2)
     search = "Settlers of Catan Board Game"
     required_text = "Catan"
     sb.cdp.press_keys('input[aria-label="Search"]', search + "\n")
     sb.sleep(3.8)
+    sb.cdp.remove_elements('[data-testid="skyline-ad"]')
     print('*** Walmart Search for "%s":' % search)
     print('    (Results must contain "%s".)' % required_text)
     unique_item_text = []
@@ -270,11 +328,11 @@ with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
 ```python
 from seleniumbase import SB
 
-with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+with SB(uc=True, test=True, locale="en", pls="none") as sb:
     url = "https://www.nike.com/"
     sb.activate_cdp_mode(url)
     sb.sleep(2.5)
-    sb.cdp.gui_click_element('div[data-testid="user-tools-container"]')
+    sb.cdp.click('div[data-testid="user-tools-container"]')
     sb.sleep(1.5)
     search = "Nike Air Force 1"
     sb.cdp.press_keys('input[type="search"]', search)
@@ -301,8 +359,6 @@ with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
 
 ### 🐙 <b translate="no">CDP Mode</b> API / Methods
 
-(Some method args have been left out for simplicity. Eg: <code translate="no">timeout</code>)
-
 ```python
 sb.cdp.get(url)
 sb.cdp.open(url)
@@ -310,16 +366,16 @@ sb.cdp.reload(ignore_cache=True, script_to_evaluate_on_load=None)
 sb.cdp.refresh()
 sb.cdp.get_event_loop()
 sb.cdp.add_handler(event, handler)
-sb.cdp.find_element(selector)
-sb.cdp.find(selector)
-sb.cdp.locator(selector)
-sb.cdp.find_element_by_text(text, tag_name=None)
-sb.cdp.find_all(selector)
+sb.cdp.find_element(selector, best_match=False, timeout=None)
+sb.cdp.find(selector, best_match=False, timeout=None)
+sb.cdp.locator(selector, best_match=False, timeout=None)
+sb.cdp.find_element_by_text(text, tag_name=None, timeout=None)
+sb.cdp.find_all(selector, timeout=None)
 sb.cdp.find_elements_by_text(text, tag_name=None)
-sb.cdp.select(selector)
-sb.cdp.select_all(selector)
-sb.cdp.find_elements(selector)
-sb.cdp.find_visible_elements(selector)
+sb.cdp.select(selector, timeout=None)
+sb.cdp.select_all(selector, timeout=None)
+sb.cdp.find_elements(selector, timeout=None)
+sb.cdp.find_visible_elements(selector, timeout=None)
 sb.cdp.click_nth_element(selector, number)
 sb.cdp.click_nth_visible_element(selector, number)
 sb.cdp.click_link(link_text)
@@ -331,17 +387,17 @@ sb.cdp.get_all_cookies(*args, **kwargs)
 sb.cdp.set_all_cookies(*args, **kwargs)
 sb.cdp.save_cookies(*args, **kwargs)
 sb.cdp.load_cookies(*args, **kwargs)
-sb.cdp.clear_cookies(*args, **kwargs)
+sb.cdp.clear_cookies()
 sb.cdp.sleep(seconds)
 sb.cdp.bring_active_window_to_front()
 sb.cdp.bring_to_front()
 sb.cdp.get_active_element()
 sb.cdp.get_active_element_css()
-sb.cdp.click(selector)
+sb.cdp.click(selector, timeout=None)
 sb.cdp.click_active_element()
 sb.cdp.click_if_visible(selector)
 sb.cdp.click_visible_elements(selector, limit=0)
-sb.cdp.mouse_click(selector)
+sb.cdp.mouse_click(selector, timeout=None)
 sb.cdp.nested_click(parent_selector, selector)
 sb.cdp.get_nested_element(parent_selector, selector)
 sb.cdp.select_option_by_text(dropdown_selector, option)
@@ -349,13 +405,14 @@ sb.cdp.flash(selector, duration=1, color="44CC88", pause=0)
 sb.cdp.highlight(selector)
 sb.cdp.focus(selector)
 sb.cdp.highlight_overlay(selector)
+sb.cdp.get_parent(element)
 sb.cdp.remove_element(selector)
 sb.cdp.remove_from_dom(selector)
 sb.cdp.remove_elements(selector)
-sb.cdp.send_keys(selector, text)
-sb.cdp.press_keys(selector, text)
-sb.cdp.type(selector, text)
-sb.cdp.set_value(selector, text)
+sb.cdp.send_keys(selector, text, timeout=None)
+sb.cdp.press_keys(selector, text, timeout=None)
+sb.cdp.type(selector, text, timeout=None)
+sb.cdp.set_value(selector, text, timeout=None)
 sb.cdp.evaluate(expression)
 sb.cdp.js_dumps(obj_name)
 sb.cdp.maximize()
@@ -376,11 +433,11 @@ sb.cdp.get_screen_rect()
 sb.cdp.get_window_rect()
 sb.cdp.get_window_size()
 sb.cdp.get_window_position()
-sb.cdp.get_element_rect(selector)
-sb.cdp.get_element_size(selector)
-sb.cdp.get_element_position(selector)
-sb.cdp.get_gui_element_rect(selector)
-sb.cdp.get_gui_element_center(selector)
+sb.cdp.get_element_rect(selector, timeout=None)
+sb.cdp.get_element_size(selector, timeout=None)
+sb.cdp.get_element_position(selector, timeout=None)
+sb.cdp.get_gui_element_rect(selector, timeout=None)
+sb.cdp.get_gui_element_center(selector, timeout=None)
 sb.cdp.get_document()
 sb.cdp.get_flattened_document()
 sb.cdp.get_element_attributes(selector)
@@ -408,19 +465,26 @@ sb.cdp.uncheck_if_checked(selector)
 sb.cdp.unselect_if_selected(selector)
 sb.cdp.is_element_present(selector)
 sb.cdp.is_element_visible(selector)
-sb.cdp.wait_for_element_visible(selector)
-sb.cdp.assert_element(selector)
-sb.cdp.assert_element_visible(selector)
-sb.cdp.assert_element_present(selector)
-sb.cdp.assert_element_absent(selector)
-sb.cdp.assert_element_not_visible(selector)
+sb.cdp.is_text_visible(text, selector="body")
+sb.cdp.is_exact_text_visible(text, selector="body")
+sb.cdp.wait_for_text(text, selector="body", timeout=None)
+sb.cdp.wait_for_text_not_visible(text, selector="body", timeout=None)
+sb.cdp.wait_for_element_visible(selector, timeout=None)
+sb.cdp.wait_for_element_not_visible(selector, timeout=None)
+sb.cdp.wait_for_element_absent(selector, timeout=None)
+sb.cdp.assert_element(selector, timeout=None)
+sb.cdp.assert_element_visible(selector, timeout=None)
+sb.cdp.assert_element_present(selector, timeout=None)
+sb.cdp.assert_element_absent(selector, timeout=None)
+sb.cdp.assert_element_not_visible(selector, timeout=None)
 sb.cdp.assert_element_attribute(selector, attribute, value=None)
 sb.cdp.assert_title(title)
 sb.cdp.assert_title_contains(substring)
 sb.cdp.assert_url(url)
 sb.cdp.assert_url_contains(substring)
-sb.cdp.assert_text(text, selector="html")
-sb.cdp.assert_exact_text(text, selector="html")
+sb.cdp.assert_text(text, selector="html", timeout=None)
+sb.cdp.assert_exact_text(text, selector="html", timeout=None)
+sb.cdp.assert_text_not_visible(text, selector="body", timeout=None)
 sb.cdp.assert_true()
 sb.cdp.assert_false()
 sb.cdp.assert_equal(first, second)
@@ -445,10 +509,12 @@ element.clear_input()
 element.click()
 element.flash(duration=0.5, color="EE4488")
 element.focus()
+element.gui_click(timeframe=0.25)
 element.highlight_overlay()
 element.mouse_click()
 element.mouse_drag(destination)
 element.mouse_move()
+element.press_keys(text)
 element.query_selector(selector)
 element.querySelector(selector)
 element.query_selector_all(selector)
@@ -466,6 +532,7 @@ element.get_position()
 element.get_html()
 element.get_js_attributes()
 element.get_attribute(attribute)
+element.get_parent()
 ```
 
 --------

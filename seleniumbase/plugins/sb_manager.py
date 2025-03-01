@@ -10,7 +10,7 @@ Example -->
 ```python
 from seleniumbase import SB
 
-with SB() as sb:  # Many args! Eg. SB(browser="edge")
+with SB(uc=True) as sb:  # Many args! Eg. SB(browser="edge")
     sb.open("https://google.com/ncr")
     sb.type('[name="q"]', "SeleniumBase on GitHub\n")
     sb.click('a[href*="github.com/seleniumbase"]')
@@ -119,6 +119,8 @@ def SB(
     pls=None,  # Shortcut / Duplicate of "page_load_strategy".
     sjw=None,  # Shortcut / Duplicate of "skip_js_waits".
     wfa=None,  # Shortcut / Duplicate of "wait_for_angularjs".
+    cft=None,  # Use "Chrome for Testing"
+    chs=None,  # Use "Chrome-Headless-Shell"
     save_screenshot=None,  # Save a screenshot at the end of each test.
     no_screenshot=None,  # No screenshots saved unless tests directly ask it.
     page_load_strategy=None,  # Set Chrome PLS to "normal", "eager", or "none".
@@ -568,6 +570,42 @@ def SB(
                 break
             count += 1
     user_agent = agent
+    found_bl = None
+    if binary_location is None and "--binary-location" in arg_join:
+        count = 0
+        for arg in sys_argv:
+            if arg.startswith("--binary-location="):
+                found_bl = arg.split("--binary-location=")[1]
+                break
+            elif arg == "--binary-location" and len(sys_argv) > count + 1:
+                found_bl = sys_argv[count + 1]
+                if found_bl.startswith("-"):
+                    found_bl = None
+                break
+            count += 1
+        if found_bl:
+            binary_location = found_bl
+    if binary_location is None and "--bl=" in arg_join:
+        for arg in sys_argv:
+            if arg.startswith("--bl="):
+                binary_location = arg.split("--bl=")[1]
+                break
+    if cft and not binary_location:
+        binary_location = "cft"
+    elif chs and not binary_location:
+        binary_location = "chs"
+    if "--cft" in sys_argv and not binary_location:
+        binary_location = "cft"
+    elif "--chs" in sys_argv and not binary_location:
+        binary_location = "chs"
+    if (
+        binary_location
+        and binary_location.lower() == "chs"
+        and browser == "chrome"
+    ):
+        headless = True
+        headless1 = False
+        headless2 = False
     recorder_mode = False
     if recorder_ext:
         recorder_mode = True
@@ -1256,6 +1294,19 @@ def SB(
             print(traceback.format_exc().strip())
             if test and not test_passed:
                 print("********** ERROR: The test AND the tearDown() FAILED!")
+        if (
+            hasattr(sb_config, "_virtual_display")
+            and sb_config._virtual_display
+            and hasattr(sb_config._virtual_display, "stop")
+        ):
+            try:
+                sb_config._virtual_display.stop()
+                sb_config._virtual_display = None
+                sb_config.headless_active = False
+            except AttributeError:
+                pass
+            except Exception:
+                pass
         end_time = time.time()
         run_time = end_time - start_time
         sb_config = sb_config_backup

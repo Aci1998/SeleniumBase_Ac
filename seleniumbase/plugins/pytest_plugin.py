@@ -185,6 +185,20 @@ def pytest_addoption(parser):
         help="""Shortcut for --browser=safari""",
     )
     parser.addoption(
+        "--cft",
+        action="store_true",
+        dest="use_cft",
+        default=False,
+        help="""Shortcut for using `Chrome for Testing`""",
+    )
+    parser.addoption(
+        "--chs",
+        action="store_true",
+        dest="use_chs",
+        default=False,
+        help="""Shortcut for using `Chrome-Headless-Shell`""",
+    )
+    parser.addoption(
         "--with-selenium",
         action="store_true",
         dest="with_selenium",
@@ -656,6 +670,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--binary_location",
         "--binary-location",
+        "--bl",
         action="store",
         dest="binary_location",
         default=None,
@@ -1371,6 +1386,7 @@ def pytest_addoption(parser):
 
     arg_join = " ".join(sys_argv)
     sb_config._browser_shortcut = None
+    sb_config._vd_list = []
 
     # SeleniumBase does not support pytest-timeout due to hanging browsers.
     for arg in sys_argv:
@@ -1573,6 +1589,18 @@ def pytest_configure(config):
     sb_config.extension_dir = config.getoption("extension_dir")
     sb_config.disable_features = config.getoption("disable_features")
     sb_config.binary_location = config.getoption("binary_location")
+    if config.getoption("use_cft") and not sb_config.binary_location:
+        sb_config.binary_location = "cft"
+    elif config.getoption("use_chs") and not sb_config.binary_location:
+        sb_config.binary_location = "chs"
+    if (
+        sb_config.binary_location
+        and sb_config.binary_location.lower() == "chs"
+        and sb_config.browser == "chrome"
+    ):
+        sb_config.headless = True
+        sb_config.headless1 = False
+        sb_config.headless2 = False
     sb_config.driver_version = config.getoption("driver_version")
     sb_config.page_load_strategy = config.getoption("page_load_strategy")
     sb_config.with_testing_base = config.getoption("with_testing_base")
@@ -2017,6 +2045,13 @@ def pytest_runtest_teardown(item):
                 hasattr(self, "_xvfb_display")
                 and self._xvfb_display
                 and hasattr(self._xvfb_display, "stop")
+                and (
+                    not hasattr(sb_config, "reuse_session")
+                    or (
+                        hasattr(sb_config, "reuse_session")
+                        and not sb_config.reuse_session
+                    )
+                )
             ):
                 self.headless_active = False
                 sb_config.headless_active = False
@@ -2026,6 +2061,13 @@ def pytest_runtest_teardown(item):
                 hasattr(sb_config, "_virtual_display")
                 and sb_config._virtual_display
                 and hasattr(sb_config._virtual_display, "stop")
+                and (
+                    not hasattr(sb_config, "reuse_session")
+                    or (
+                        hasattr(sb_config, "reuse_session")
+                        and not sb_config.reuse_session
+                    )
+                )
             ):
                 sb_config._virtual_display.stop()
                 sb_config._virtual_display = None
@@ -2139,6 +2181,21 @@ def _perform_pytest_unconfigure_(config):
             except Exception:
                 pass
         sb_config.shared_driver = None
+        with suppress(Exception):
+            if (
+                hasattr(sb_config, "_virtual_display")
+                and sb_config._virtual_display
+                and hasattr(sb_config._virtual_display, "stop")
+            ):
+                sb_config._virtual_display.stop()
+                sb_config._virtual_display = None
+                sb_config.headless_active = False
+            if hasattr(sb_config, "_vd_list") and sb_config._vd_list:
+                if isinstance(sb_config._vd_list, list):
+                    for display in sb_config._vd_list:
+                        if display:
+                            with suppress(Exception):
+                                display.stop()
     if hasattr(sb_config, "log_path") and sb_config.item_count > 0:
         log_helper.archive_logs_if_set(
             constants.Logs.LATEST + "/", sb_config.archive_logs
@@ -2194,6 +2251,9 @@ def _perform_pytest_unconfigure_(config):
                 ph_link, "%s and %s" % (sb_link, ph_link)
             )
             the_html_r = the_html_r.replace(
+                "findAll('.collapsible", "//findAll('.collapsible"
+            )
+            the_html_r = the_html_r.replace(
                 "mediaName.innerText", "//mediaName.innerText"
             )
             the_html_r = the_html_r.replace(
@@ -2228,6 +2288,9 @@ def _perform_pytest_unconfigure_(config):
                     html_style = html_style.replace(
                         "- 80px);", "- 80px);\n  margin-bottom: -42px;"
                     )
+                    html_style = html_style.replace(".collapsible", ".oldc")
+                    html_style = html_style.replace(" (hide details)", "")
+                    html_style = html_style.replace(" (show details)", "")
                 with open(assets_style, "w", encoding="utf-8") as f:
                     f.write(html_style)
                 with suppress(Exception):
@@ -2327,6 +2390,9 @@ def _perform_pytest_unconfigure_(config):
                     html_style = html_style.replace(
                         "- 80px);", "- 80px);\n  margin-bottom: -42px;"
                     )
+                    html_style = html_style.replace(".collapsible", ".oldc")
+                    html_style = html_style.replace(" (hide details)", "")
+                    html_style = html_style.replace(" (show details)", "")
                 with open(assets_style, "w", encoding="utf-8") as f:
                     f.write(html_style)
                 with suppress(Exception):
@@ -2395,6 +2461,9 @@ def _perform_pytest_unconfigure_(config):
                     ph_link, "%s and %s" % (sb_link, ph_link)
                 )
                 the_html_r = the_html_r.replace(
+                    "findAll('.collapsible", "//findAll('.collapsible"
+                )
+                the_html_r = the_html_r.replace(
                     "mediaName.innerText", "//mediaName.innerText"
                 )
                 the_html_r = the_html_r.replace(
@@ -2426,6 +2495,9 @@ def _perform_pytest_unconfigure_(config):
 def pytest_unconfigure(config):
     """This runs after all tests have completed with pytest."""
     if "--co" in sys_argv or "--collect-only" in sys_argv:
+        return
+    reporter = config.pluginmanager.get_plugin("terminalreporter")
+    if not hasattr(reporter, "_sessionstarttime"):
         return
     if hasattr(sb_config, "_multithreaded") and sb_config._multithreaded:
         import fasteners

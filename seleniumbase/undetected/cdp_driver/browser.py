@@ -10,10 +10,12 @@ import pathlib
 import pickle
 import re
 import shutil
+import time
 import urllib.parse
 import urllib.request
 import warnings
 from collections import defaultdict
+from seleniumbase import config as sb_config
 from typing import List, Set, Tuple, Union
 import mycdp as cdp
 from . import cdp_util as util
@@ -30,8 +32,6 @@ def get_registered_instances():
 
 
 def deconstruct_browser():
-    import time
-
     for _ in __registered__instances__:
         if not _.stopped:
             _.stop()
@@ -117,8 +117,13 @@ class Browser:
                 port=port,
                 **kwargs,
             )
-        instance = cls(config)
-        await instance.start()
+        try:
+            instance = cls(config)
+            await instance.start()
+        except Exception:
+            time.sleep(0.15)
+            instance = cls(config)
+            await instance.start()
         return instance
 
     def __init__(self, config: Config, **kwargs):
@@ -261,6 +266,8 @@ class Browser:
         :param new_window: Open new window
         :return: Page
         """
+        if url and ":" not in url:
+            url = "https://" + url
         if new_tab or new_window:
             # Create new target using the browser session.
             target_id = await self.connection.send(
@@ -281,6 +288,9 @@ class Browser:
                 filter(lambda item: item.type_ == "page", self.targets)
             )
             # Use the tab to navigate to new url
+            if hasattr(sb_config, "_cdp_locale") and sb_config._cdp_locale:
+                await connection.send(cdp.page.navigate("about:blank"))
+                await connection.set_locale(sb_config._cdp_locale)
             frame_id, loader_id, *_ = await connection.send(
                 cdp.page.navigate(url)
             )
@@ -379,8 +389,6 @@ class Browser:
                     --------------------------------
                     Failed to connect to the browser
                     --------------------------------
-                    Possibly because you are running as "root".
-                    If so, you may need to use no_sandbox=True.
                     """
                 )
             )
@@ -563,10 +571,11 @@ class Browser:
             # asyncio.get_running_loop().create_task(
             #     self.connection.send(cdp.browser.close())
             # )
-            asyncio.get_event_loop().create_task(self.connection.aclose())
-            logger.debug(
-                "Closed the connection using get_event_loop().create_task()"
-            )
+            if self.connection:
+                asyncio.get_event_loop().create_task(self.connection.aclose())
+                logger.debug(
+                    "Closed connection using get_event_loop().create_task()"
+                )
         except RuntimeError:
             if self.connection:
                 try:

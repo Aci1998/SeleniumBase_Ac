@@ -1,4 +1,5 @@
 """Add CDP methods to extend the driver"""
+import asyncio
 import fasteners
 import os
 import re
@@ -11,6 +12,7 @@ from seleniumbase.fixtures import constants
 from seleniumbase.fixtures import js_utils
 from seleniumbase.fixtures import page_utils
 from seleniumbase.fixtures import shared_utils
+from seleniumbase.undetected.cdp_driver import cdp_util
 
 
 class CDPMethods():
@@ -18,6 +20,11 @@ class CDPMethods():
         self.loop = loop
         self.page = page
         self.driver = driver
+
+    def _swap_driver(self, driver):
+        self.driver = driver
+        self.page = driver.cdp.page
+        self.loop = driver.cdp.loop
 
     def __slow_mode_pause_if_set(self):
         if (
@@ -51,12 +58,16 @@ class CDPMethods():
             element, *args, **kwargs
         )
         element.focus = lambda: self.__focus(element)
+        element.gui_click = (
+            lambda *args, **kwargs: self.__gui_click(element, *args, **kwargs)
+        )
         element.highlight_overlay = lambda: self.__highlight_overlay(element)
         element.mouse_click = lambda: self.__mouse_click(element)
         element.mouse_drag = (
             lambda destination: self.__mouse_drag(element, destination)
         )
         element.mouse_move = lambda: self.__mouse_move(element)
+        element.press_keys = lambda text: self.__press_keys(element, text)
         element.query_selector = (
             lambda selector: self.__query_selector(element, selector)
         )
@@ -86,6 +97,8 @@ class CDPMethods():
         element.get_attribute = (
             lambda attribute: self.__get_attribute(element, attribute)
         )
+        # element.get_parent() should come last
+        element.get_parent = lambda: self.__get_parent(element)
         return element
 
     def get(self, url):
@@ -127,14 +140,14 @@ class CDPMethods():
     def add_handler(self, event, handler):
         self.page.add_handler(event, handler)
 
-    def find_element(
-        self, selector, best_match=False, timeout=settings.SMALL_TIMEOUT
-    ):
+    def find_element(self, selector, best_match=False, timeout=None):
         """Similar to select(), but also finds elements by text content.
         When using text-based searches, if best_match=False, then will
         find the first element with the text. If best_match=True, then
         if multiple elements have that text, then will use the element
         with the closest text-length to the text being searched for."""
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         self.__add_light_pause()
         selector = self.__convert_to_css_if_xpath(selector)
         early_failure = False
@@ -167,12 +180,12 @@ class CDPMethods():
         self.__slow_mode_pause_if_set()
         return element
 
-    def find_element_by_text(
-        self, text, tag_name=None, timeout=settings.SMALL_TIMEOUT
-    ):
+    def find_element_by_text(self, text, tag_name=None, timeout=None):
         """Returns an element by matching text.
         Optionally, provide a tag_name to narrow down the search to an
         element with the given tag. (Eg: a, button, div, script, span)"""
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         self.__add_light_pause()
         time_now = time.time()
         self.assert_text(text, timeout=timeout)
@@ -197,14 +210,17 @@ class CDPMethods():
                 element = self.__add_sync_methods(element)
                 return self.__add_sync_methods(element)
             elif (
-                element.parent
+                element
+                and element.parent
                 and tag_name in element.parent.tag_name.lower()
                 and text.strip() in element.parent.text
             ):
                 element = self.__add_sync_methods(element.parent)
                 return self.__add_sync_methods(element)
             elif (
-                element.parent.parent
+                element
+                and element.parent
+                and element.parent.parent
                 and tag_name in element.parent.parent.tag_name.lower()
                 and text.strip() in element.parent.parent.text
             ):
@@ -218,7 +234,9 @@ class CDPMethods():
             % (text, tag_name, timeout, plural)
         )
 
-    def find_all(self, selector, timeout=settings.SMALL_TIMEOUT):
+    def find_all(self, selector, timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         self.__add_light_pause()
         selector = self.__convert_to_css_if_xpath(selector)
         elements = self.loop.run_until_complete(
@@ -255,7 +273,8 @@ class CDPMethods():
                 if element not in updated_elements:
                     updated_elements.append(element)
             elif (
-                element.parent
+                element
+                and element.parent
                 and tag_name in element.parent.tag_name.lower()
                 and text.strip() in element.parent.text
             ):
@@ -263,7 +282,9 @@ class CDPMethods():
                 if element not in updated_elements:
                     updated_elements.append(element)
             elif (
-                element.parent.parent
+                element
+                and element.parent
+                and element.parent.parent
                 and tag_name in element.parent.parent.tag_name.lower()
                 and text.strip() in element.parent.parent.text
             ):
@@ -272,20 +293,35 @@ class CDPMethods():
                     updated_elements.append(element)
         return updated_elements
 
-    def select(self, selector, timeout=settings.SMALL_TIMEOUT):
-        """Similar to find_element(), but without text-based search."""
+    def select(self, selector, timeout=None):
+        """Similar to find_element()."""
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         self.__add_light_pause()
         selector = self.__convert_to_css_if_xpath(selector)
         if (":contains(" in selector):
             tag_name = selector.split(":contains(")[0].split(" ")[-1]
             text = selector.split(":contains(")[1].split(")")[0][1:-1]
             with suppress(Exception):
+                new_timeout = timeout
+                if new_timeout < 1:
+                    new_timeout = 1
                 self.loop.run_until_complete(
-                    self.page.select(tag_name, timeout=5)
+                    self.page.select(tag_name, timeout=new_timeout)
                 )
-                self.loop.run_until_complete(self.page.find(text, timeout=5))
-            element = self.find_elements_by_text(text, tag_name=tag_name)[0]
-            return self.__add_sync_methods(element)
+                self.loop.run_until_complete(
+                    self.page.find(text, timeout=new_timeout)
+                )
+            elements = self.find_elements_by_text(text, tag_name=tag_name)
+            if not elements:
+                plural = "s"
+                if timeout == 1:
+                    plural = ""
+                msg = "\n Element {%s} was not found after %s second%s!"
+                message = msg % (selector, timeout, plural)
+                raise Exception(message)
+            element = self.__add_sync_methods(elements[0])
+            return element
         failure = False
         try:
             element = self.loop.run_until_complete(
@@ -296,18 +332,17 @@ class CDPMethods():
             plural = "s"
             if timeout == 1:
                 plural = ""
-            message = "\n Element {%s} was not found after %s second%s!" % (
-                selector,
-                timeout,
-                plural,
-            )
+            msg = "\n Element {%s} was not found after %s second%s!"
+            message = msg % (selector, timeout, plural)
         if failure:
             raise Exception(message)
         element = self.__add_sync_methods(element)
         self.__slow_mode_pause_if_set()
         return element
 
-    def select_all(self, selector, timeout=settings.SMALL_TIMEOUT):
+    def select_all(self, selector, timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         self.__add_light_pause()
         selector = self.__convert_to_css_if_xpath(selector)
         elements = self.loop.run_until_complete(
@@ -319,10 +354,14 @@ class CDPMethods():
             updated_elements.append(element)
         return updated_elements
 
-    def find_elements(self, selector, timeout=settings.SMALL_TIMEOUT):
+    def find_elements(self, selector, timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         return self.select_all(selector, timeout=timeout)
 
-    def find_visible_elements(self, selector, timeout=settings.SMALL_TIMEOUT):
+    def find_visible_elements(self, selector, timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         visible_elements = []
         elements = self.select_all(selector, timeout=timeout)
         for element in elements:
@@ -406,6 +445,39 @@ class CDPMethods():
             self.loop.run_until_complete(element.focus_async())
         )
 
+    def __gui_click(self, element, timeframe=None):
+        element.scroll_into_view()
+        self.__add_light_pause()
+        position = element.get_position()
+        x = position.x
+        y = position.y
+        e_width = position.width
+        e_height = position.height
+        # Relative to window
+        element_rect = {"height": e_height, "width": e_width, "x": x, "y": y}
+        window_rect = self.get_window_rect()
+        w_bottom_y = window_rect["y"] + window_rect["height"]
+        viewport_height = window_rect["innerHeight"]
+        x = window_rect["x"] + element_rect["x"]
+        y = w_bottom_y - viewport_height + element_rect["y"]
+        y_scroll_offset = window_rect["pageYOffset"]
+        y = y - y_scroll_offset
+        x = x + window_rect["scrollX"]
+        y = y + window_rect["scrollY"]
+        # Relative to screen
+        element_rect = {"height": e_height, "width": e_width, "x": x, "y": y}
+        e_width = element_rect["width"]
+        e_height = element_rect["height"]
+        e_x = element_rect["x"]
+        e_y = element_rect["y"]
+        x, y = ((e_x + e_width / 2.0) + 0.5), ((e_y + e_height / 2.0) + 0.5)
+        if not timeframe or not isinstance(timeframe, (int, float)):
+            timeframe = 0.25
+        if timeframe > 3:
+            timeframe = 3
+        self.gui_click_x_y(x, y, timeframe=timeframe)
+        return self.loop.run_until_complete(self.page.wait())
+
     def __highlight_overlay(self, element):
         return (
             self.loop.run_until_complete(element.highlight_overlay_async())
@@ -427,6 +499,21 @@ class CDPMethods():
         return (
             self.loop.run_until_complete(element.mouse_move_async())
         )
+
+    def __press_keys(self, element, text):
+        element.scroll_into_view()
+        submit = False
+        if text.endswith("\n") or text.endswith("\r"):
+            submit = True
+            text = text[:-1]
+        for key in text:
+            element.send_keys(key)
+            time.sleep(0.044)
+        if submit:
+            element.send_keys("\r\n")
+            time.sleep(0.044)
+        self.__slow_mode_pause_if_set()
+        return self.loop.run_until_complete(self.page.sleep(0.025))
 
     def __query_selector(self, element, selector):
         selector = self.__convert_to_css_if_xpath(selector)
@@ -519,7 +606,23 @@ class CDPMethods():
         try:
             return element.get_js_attributes()[attribute]
         except Exception:
-            return None
+            if not attribute:
+                raise
+            try:
+                attribute_str = element.get_js_attributes()
+                locate = ' %s="' % attribute
+                if locate in attribute_str.outerHTML:
+                    outer_html = attribute_str.outerHTML
+                    attr_start = outer_html.find(locate) + len(locate)
+                    attr_end = outer_html.find('"', attr_start)
+                    value = outer_html[attr_start:attr_end]
+                    return value
+            except Exception:
+                pass
+        return None
+
+    def __get_parent(self, element):
+        return self.__add_sync_methods(element.parent)
 
     def __get_x_scroll_offset(self):
         x_scroll_offset = self.loop.run_until_complete(
@@ -574,12 +677,12 @@ class CDPMethods():
             driver.cookies.load(*args, **kwargs)
         )
 
-    def clear_cookies(self, *args, **kwargs):
+    def clear_cookies(self):
         driver = self.driver
         if hasattr(driver, "cdp_base"):
             driver = driver.cdp_base
         return self.loop.run_until_complete(
-            driver.cookies.clear(*args, **kwargs)
+            driver.cookies.clear()
         )
 
     def sleep(self, seconds):
@@ -603,7 +706,9 @@ class CDPMethods():
             self.page.evaluate(js_code)
         )
 
-    def click(self, selector, timeout=settings.SMALL_TIMEOUT):
+    def click(self, selector, timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         self.__slow_mode_pause_if_set()
         element = self.find_element(selector, timeout=timeout)
         element.scroll_into_view()
@@ -620,11 +725,12 @@ class CDPMethods():
 
     def click_if_visible(self, selector):
         if self.is_element_visible(selector):
-            element = self.find_element(selector)
-            element.scroll_into_view()
-            element.click()
-            self.__slow_mode_pause_if_set()
-            self.loop.run_until_complete(self.page.wait())
+            with suppress(Exception):
+                element = self.find_element(selector, timeout=0)
+                element.scroll_into_view()
+                element.click()
+                self.__slow_mode_pause_if_set()
+                self.loop.run_until_complete(self.page.wait())
 
     def click_visible_elements(self, selector, limit=0):
         """Finds all matching page elements and clicks visible ones in order.
@@ -658,8 +764,10 @@ class CDPMethods():
             except Exception:
                 break
 
-    def mouse_click(self, selector, timeout=settings.SMALL_TIMEOUT):
+    def mouse_click(self, selector, timeout=None):
         """(Attempt simulating a mouse click)"""
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         self.__slow_mode_pause_if_set()
         element = self.find_element(selector, timeout=timeout)
         element.scroll_into_view()
@@ -736,6 +844,11 @@ class CDPMethods():
     def highlight_overlay(self, selector):
         self.find_element(selector).highlight_overlay()
 
+    def get_parent(self, element):
+        if isinstance(element, str):
+            element = self.select(element)
+        return self.__add_sync_methods(element.parent)
+
     def remove_element(self, selector):
         self.select(selector).remove_from_dom()
 
@@ -757,7 +870,9 @@ class CDPMethods():
         with suppress(Exception):
             self.loop.run_until_complete(self.page.evaluate(js_code))
 
-    def send_keys(self, selector, text, timeout=settings.SMALL_TIMEOUT):
+    def send_keys(self, selector, text, timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         self.__slow_mode_pause_if_set()
         element = self.select(selector, timeout=timeout)
         element.scroll_into_view()
@@ -765,10 +880,12 @@ class CDPMethods():
             text = text[:-1] + "\r\n"
         element.send_keys(text)
         self.__slow_mode_pause_if_set()
-        self.loop.run_until_complete(self.page.wait())
+        self.loop.run_until_complete(self.page.sleep(0.025))
 
-    def press_keys(self, selector, text, timeout=settings.SMALL_TIMEOUT):
+    def press_keys(self, selector, text, timeout=None):
         """Similar to send_keys(), but presses keys at human speed."""
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         self.__slow_mode_pause_if_set()
         element = self.select(selector, timeout=timeout)
         element.scroll_into_view()
@@ -783,10 +900,12 @@ class CDPMethods():
             element.send_keys("\r\n")
             time.sleep(0.044)
         self.__slow_mode_pause_if_set()
-        self.loop.run_until_complete(self.page.wait())
+        self.loop.run_until_complete(self.page.sleep(0.025))
 
-    def type(self, selector, text, timeout=settings.SMALL_TIMEOUT):
+    def type(self, selector, text, timeout=None):
         """Similar to send_keys(), but clears the text field first."""
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         self.__slow_mode_pause_if_set()
         element = self.select(selector, timeout=timeout)
         element.scroll_into_view()
@@ -796,10 +915,12 @@ class CDPMethods():
             text = text[:-1] + "\r\n"
         element.send_keys(text)
         self.__slow_mode_pause_if_set()
-        self.loop.run_until_complete(self.page.wait())
+        self.loop.run_until_complete(self.page.sleep(0.025))
 
-    def set_value(self, selector, text, timeout=settings.SMALL_TIMEOUT):
+    def set_value(self, selector, text, timeout=None):
         """Similar to send_keys(), but clears the text field first."""
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         self.__slow_mode_pause_if_set()
         selector = self.__convert_to_css_if_xpath(selector)
         element = self.select(selector, timeout=timeout)
@@ -832,12 +953,17 @@ class CDPMethods():
             self.__add_light_pause()
             self.send_keys(selector, "\n")
         self.__slow_mode_pause_if_set()
-        self.loop.run_until_complete(self.page.wait())
+        self.loop.run_until_complete(self.page.sleep(0.025))
 
     def evaluate(self, expression):
         """Run a JavaScript expression and return the result."""
-        if expression.startswith("return "):
-            expression = expression[len("return "):]
+        expression = expression.strip()
+        exp_list = expression.split("\n")
+        if exp_list and exp_list[-1].strip().startswith("return "):
+            expression = (
+                "\n".join(exp_list[0:-1]) + "\n"
+                + exp_list[-1].strip()[len("return "):]
+            ).strip()
         return self.loop.run_until_complete(
             self.page.evaluate(expression)
         )
@@ -1022,7 +1148,9 @@ class CDPMethods():
         coordinates["y"] = y if y else 0
         return coordinates
 
-    def get_element_rect(self, selector, timeout=settings.SMALL_TIMEOUT):
+    def get_element_rect(self, selector, timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         selector = self.__convert_to_css_if_xpath(selector)
         self.select(selector, timeout=timeout)
         self.__add_light_pause()
@@ -1035,23 +1163,29 @@ class CDPMethods():
         )
         return coordinates
 
-    def get_element_size(self, selector):
-        element_rect = self.get_element_rect(selector)
+    def get_element_size(self, selector, timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
+        element_rect = self.get_element_rect(selector, timeout=timeout)
         coordinates = {}
         coordinates["width"] = element_rect["width"]
         coordinates["height"] = element_rect["height"]
         return coordinates
 
-    def get_element_position(self, selector):
-        element_rect = self.get_element_rect(selector)
+    def get_element_position(self, selector, timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
+        element_rect = self.get_element_rect(selector, timeout=timeout)
         coordinates = {}
         coordinates["x"] = element_rect["x"]
         coordinates["y"] = element_rect["y"]
         return coordinates
 
-    def get_gui_element_rect(self, selector):
+    def get_gui_element_rect(self, selector, timeout=None):
         """(Coordinates are relative to the screen. Not the window.)"""
-        element_rect = self.get_element_rect(selector)
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
+        element_rect = self.get_element_rect(selector, timeout=timeout)
         e_width = element_rect["width"]
         e_height = element_rect["height"]
         window_rect = self.get_window_rect()
@@ -1065,9 +1199,11 @@ class CDPMethods():
         y = y + window_rect["scrollY"]
         return ({"height": e_height, "width": e_width, "x": x, "y": y})
 
-    def get_gui_element_center(self, selector):
+    def get_gui_element_center(self, selector, timeout=None):
         """(Coordinates are relative to the screen. Not the window.)"""
-        element_rect = self.get_gui_element_rect(selector)
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
+        element_rect = self.get_gui_element_rect(selector, timeout=timeout)
         e_width = element_rect["width"]
         e_height = element_rect["height"]
         e_x = element_rect["x"]
@@ -1094,7 +1230,14 @@ class CDPMethods():
         )
 
     def get_element_attribute(self, selector, attribute):
-        return self.get_element_attributes(selector)[attribute]
+        attributes = self.get_element_attributes(selector)
+        with suppress(Exception):
+            return attributes[attribute]
+        locate = ' %s="' % attribute
+        value = self.get_attribute(selector, attribute)
+        if not value and locate not in attributes:
+            raise KeyError(attribute)
+        return value
 
     def get_attribute(self, selector, attribute):
         return self.find_element(selector).get_attribute(attribute)
@@ -1250,7 +1393,7 @@ class CDPMethods():
             pyautogui.press(key)
             time.sleep(0.044)
         self.__slow_mode_pause_if_set()
-        self.loop.run_until_complete(self.page.wait())
+        self.loop.run_until_complete(self.page.sleep(0.025))
 
     def gui_press_keys(self, keys):
         self.__install_pyautogui_if_missing()
@@ -1265,7 +1408,7 @@ class CDPMethods():
                 pyautogui.press(key)
                 time.sleep(0.044)
         self.__slow_mode_pause_if_set()
-        self.loop.run_until_complete(self.page.wait())
+        self.loop.run_until_complete(self.page.sleep(0.025))
 
     def gui_write(self, text):
         self.__install_pyautogui_if_missing()
@@ -1278,7 +1421,7 @@ class CDPMethods():
             self.__make_sure_pyautogui_lock_is_writable()
             pyautogui.write(text)
         self.__slow_mode_pause_if_set()
-        self.loop.run_until_complete(self.page.wait())
+        self.loop.run_until_complete(self.page.sleep(0.025))
 
     def __gui_click_x_y(self, x, y, timeframe=0.25, uc_lock=False):
         self.__install_pyautogui_if_missing()
@@ -1551,7 +1694,7 @@ class CDPMethods():
         """Return True if checkbox (or radio button) is checked."""
         selector = self.__convert_to_css_if_xpath(selector)
         self.find_element(selector, timeout=settings.SMALL_TIMEOUT)
-        return self.get_element_attribute(selector, "checked")
+        return bool(self.get_element_attribute(selector, "checked"))
 
     def is_selected(self, selector):
         selector = self.__convert_to_css_if_xpath(selector)
@@ -1608,9 +1751,81 @@ class CDPMethods():
                 return True
             return False
 
-    def wait_for_element_visible(
-        self, selector, timeout=settings.SMALL_TIMEOUT
-    ):
+    def is_text_visible(self, text, selector="body"):
+        selector = self.__convert_to_css_if_xpath(selector)
+        text = text.strip()
+        element = None
+        try:
+            element = self.find_element(selector, timeout=0.1)
+        except Exception:
+            return False
+        with suppress(Exception):
+            if text in element.text_all:
+                return True
+        return False
+
+    def is_exact_text_visible(self, text, selector="body"):
+        selector = self.__convert_to_css_if_xpath(selector)
+        text = text.strip()
+        element = None
+        try:
+            element = self.find_element(selector, timeout=0.1)
+        except Exception:
+            return False
+        with suppress(Exception):
+            if text == element.text_all.strip():
+                return True
+        return False
+
+    def wait_for_text(self, text, selector="body", timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
+        start_ms = time.time() * 1000.0
+        stop_ms = start_ms + (timeout * 1000.0)
+        text = text.strip()
+        element = None
+        try:
+            element = self.find_element(selector, timeout=timeout)
+        except Exception:
+            raise Exception("Element {%s} not found!" % selector)
+        for i in range(int(timeout * 10)):
+            with suppress(Exception):
+                element = self.find_element(selector, timeout=0.1)
+            if text in element.text_all:
+                return True
+            now_ms = time.time() * 1000.0
+            if now_ms >= stop_ms:
+                break
+            time.sleep(0.1)
+        raise Exception(
+            "Text {%s} not found in {%s}! Actual text: {%s}"
+            % (text, selector, element.text_all)
+        )
+
+    def wait_for_text_not_visible(self, text, selector="body", timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
+        text = text.strip()
+        start_ms = time.time() * 1000.0
+        stop_ms = start_ms + (timeout * 1000.0)
+        for i in range(int(timeout * 10)):
+            if not self.is_text_visible(text, selector):
+                return True
+            now_ms = time.time() * 1000.0
+            if now_ms >= stop_ms:
+                break
+            time.sleep(0.1)
+        plural = "s"
+        if timeout == 1:
+            plural = ""
+        raise Exception(
+            "Text {%s} in {%s} was still visible after %s second%s!"
+            % (text, selector, timeout, plural)
+        )
+
+    def wait_for_element_visible(self, selector, timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         try:
             self.select(selector, timeout=timeout)
         except Exception:
@@ -1621,61 +1836,10 @@ class CDPMethods():
             time.sleep(0.1)
         raise Exception("Element {%s} was not visible!" % selector)
 
-    def assert_element(self, selector, timeout=settings.SMALL_TIMEOUT):
-        """Same as assert_element_visible()"""
-        try:
-            self.select(selector, timeout=timeout)
-        except Exception:
-            raise Exception("Element {%s} was not found!" % selector)
-        for i in range(30):
-            if self.is_element_visible(selector):
-                return True
-            time.sleep(0.1)
-        raise Exception("Element {%s} was not visible!" % selector)
-
-    def assert_element_visible(self, selector, timeout=settings.SMALL_TIMEOUT):
-        """Same as assert_element()"""
-        try:
-            self.select(selector, timeout=timeout)
-        except Exception:
-            raise Exception("Element {%s} was not found!" % selector)
-        for i in range(30):
-            if self.is_element_visible(selector):
-                return True
-            time.sleep(0.1)
-        raise Exception("Element {%s} was not visible!" % selector)
-
-    def assert_element_present(self, selector, timeout=settings.SMALL_TIMEOUT):
-        """Assert element is present in the DOM. (Visibility NOT required)"""
-        try:
-            self.select(selector, timeout=timeout)
-        except Exception:
-            raise Exception("Element {%s} was not found!" % selector)
-        return True
-
-    def assert_element_absent(self, selector, timeout=settings.SMALL_TIMEOUT):
-        """Assert element is not present in the DOM."""
-        start_ms = time.time() * 1000.0
-        stop_ms = start_ms + (timeout * 1000.0)
-        for i in range(int(timeout * 10)):
-            if not self.is_element_present(selector):
-                return True
-            now_ms = time.time() * 1000.0
-            if now_ms >= stop_ms:
-                break
-            time.sleep(0.1)
-        plural = "s"
-        if timeout == 1:
-            plural = ""
-        raise Exception(
-            "Element {%s} was still present after %s second%s!"
-            % (selector, timeout, plural)
-        )
-
-    def assert_element_not_visible(
-        self, selector, timeout=settings.SMALL_TIMEOUT
-    ):
-        """Assert element is not visible on page. (May still be in DOM)"""
+    def wait_for_element_not_visible(self, selector, timeout=None):
+        """Wait for element to not be visible on page. (May still be in DOM)"""
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         start_ms = time.time() * 1000.0
         stop_ms = start_ms + (timeout * 1000.0)
         for i in range(int(timeout * 10)):
@@ -1694,6 +1858,66 @@ class CDPMethods():
             "Element {%s} was still visible after %s second%s!"
             % (selector, timeout, plural)
         )
+
+    def wait_for_element_absent(self, selector, timeout=None):
+        """Wait for element to not be present in the DOM."""
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
+        start_ms = time.time() * 1000.0
+        stop_ms = start_ms + (timeout * 1000.0)
+        for i in range(int(timeout * 10)):
+            if not self.is_element_present(selector):
+                return True
+            now_ms = time.time() * 1000.0
+            if now_ms >= stop_ms:
+                break
+            time.sleep(0.1)
+        plural = "s"
+        if timeout == 1:
+            plural = ""
+        raise Exception(
+            "Element {%s} was still present after %s second%s!"
+            % (selector, timeout, plural)
+        )
+
+    def assert_element(self, selector, timeout=None):
+        """Same as assert_element_visible()"""
+        self.assert_element_visible(selector, timeout=timeout)
+        return True
+
+    def assert_element_visible(self, selector, timeout=None):
+        """Same as assert_element()"""
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
+        try:
+            self.select(selector, timeout=timeout)
+        except Exception:
+            raise Exception("Element {%s} was not found!" % selector)
+        for i in range(30):
+            if self.is_element_visible(selector):
+                return True
+            time.sleep(0.1)
+        raise Exception("Element {%s} was not visible!" % selector)
+
+    def assert_element_present(self, selector, timeout=None):
+        """Assert element is present in the DOM. (Visibility NOT required)"""
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
+        try:
+            self.select(selector, timeout=timeout)
+        except Exception:
+            raise Exception("Element {%s} was not found!" % selector)
+        return True
+
+    def assert_element_absent(self, selector, timeout=None):
+        """Assert element is not present in the DOM."""
+        self.wait_for_element_absent(selector, timeout=timeout)
+        return True
+
+    def assert_element_not_visible(self, selector, timeout=None):
+        """Assert element is not visible on page. (May still be in DOM)"""
+        self.wait_for_element_not_visible(selector, timeout=timeout)
+        return True
 
     def assert_element_attribute(self, selector, attribute, value=None):
         attributes = self.get_element_attributes(selector)
@@ -1770,34 +1994,14 @@ class CDPMethods():
             if expected not in actual:
                 raise Exception(error % (expected, actual))
 
-    def assert_text(
-        self, text, selector="body", timeout=settings.SMALL_TIMEOUT
-    ):
-        start_ms = time.time() * 1000.0
-        stop_ms = start_ms + (timeout * 1000.0)
-        text = text.strip()
-        element = None
-        try:
-            element = self.find_element(selector, timeout=timeout)
-        except Exception:
-            raise Exception("Element {%s} not found!" % selector)
-        for i in range(int(timeout * 10)):
-            with suppress(Exception):
-                element = self.find_element(selector, timeout=0.1)
-            if text in element.text_all:
-                return True
-            now_ms = time.time() * 1000.0
-            if now_ms >= stop_ms:
-                break
-            time.sleep(0.1)
-        raise Exception(
-            "Text {%s} not found in {%s}! Actual text: {%s}"
-            % (text, selector, element.text_all)
-        )
+    def assert_text(self, text, selector="body", timeout=None):
+        """Same as wait_for_text()"""
+        self.wait_for_text(text, selector=selector, timeout=timeout)
+        return True
 
-    def assert_exact_text(
-        self, text, selector="body", timeout=settings.SMALL_TIMEOUT
-    ):
+    def assert_exact_text(self, text, selector="body", timeout=None):
+        if not timeout:
+            timeout = settings.SMALL_TIMEOUT
         start_ms = time.time() * 1000.0
         stop_ms = start_ms + (timeout * 1000.0)
         text = text.strip()
@@ -1822,6 +2026,13 @@ class CDPMethods():
             "Expected Text {%s}, is not equal to {%s} in {%s}!"
             % (text, element.text_all, selector)
         )
+
+    def assert_text_not_visible(self, text, selector="body", timeout=None):
+        """Raises an exception if the text is still visible after timeout."""
+        self.wait_for_text_not_visible(
+            text, selector=selector, timeout=timeout
+        )
+        return True
 
     def assert_true(self, expression):
         if not expression:
@@ -1888,3 +2099,13 @@ class CDPMethods():
             )
         else:
             self.select(selector).save_screenshot(filename)
+
+
+class Chrome(CDPMethods):
+    def __init__(self, url=None, **kwargs):
+        if not url:
+            url = "about:blank"
+        loop = asyncio.new_event_loop()
+        driver = cdp_util.start_sync(**kwargs)
+        page = loop.run_until_complete(driver.get(url))
+        super().__init__(loop, page, driver)

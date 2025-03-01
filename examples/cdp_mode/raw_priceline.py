@@ -1,6 +1,6 @@
 from seleniumbase import SB
 
-with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+with SB(uc=True, test=True, locale="en", ad_block=True) as sb:
     window_handle = sb.driver.current_window_handle
     url = "https://www.priceline.com"
     sb.activate_cdp_mode(url)
@@ -27,7 +27,7 @@ with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
     sb.sleep(0.8)
     for y in range(1, 9):
         sb.scroll_to_y(y * 400)
-        sb.sleep(1.25)
+        sb.sleep(0.75)
     hotel_names = sb.find_elements('a[data-autobot-element-id*="HOTEL_NAME"]')
     hotel_prices = sb.find_elements('span[font-size="4,,,5"]')
     print("Priceline Hotels in %s:" % location)

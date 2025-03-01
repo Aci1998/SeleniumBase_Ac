@@ -8,22 +8,22 @@
 
 ---
 
-<!-- YouTube View --><a href="https://www.youtube.com/watch?v=5dMFI3e85ig"><img src="http://img.youtube.com/vi/5dMFI3e85ig/0.jpg" title="SeleniumBase on YouTube" width="350" /></a>
+<!-- YouTube View --><a href="https://www.youtube.com/watch?v=5dMFI3e85ig"><img src="http://img.youtube.com/vi/5dMFI3e85ig/0.jpg" title="SeleniumBase on YouTube" width="320" /></a>
 <p>(<b><a href="https://www.youtube.com/watch?v=5dMFI3e85ig">Watch the 1st UC Mode tutorial on YouTube! ▶️</a></b>)</p>
 
 ----
 
-<!-- YouTube View --><a href="https://www.youtube.com/watch?v=2pTpBtaE7SQ"><img src="http://img.youtube.com/vi/2pTpBtaE7SQ/0.jpg" title="SeleniumBase on YouTube" width="350" /></a>
+<!-- YouTube View --><a href="https://www.youtube.com/watch?v=2pTpBtaE7SQ"><img src="http://img.youtube.com/vi/2pTpBtaE7SQ/0.jpg" title="SeleniumBase on YouTube" width="320" /></a>
 <p>(<b><a href="https://www.youtube.com/watch?v=2pTpBtaE7SQ">Watch the 2nd UC Mode tutorial on YouTube! ▶️</a></b>)</p>
 
 ----
 
-<!-- YouTube View --><a href="https://www.youtube.com/watch?v=-EpZlhGWo9k"><img src="http://img.youtube.com/vi/-EpZlhGWo9k/0.jpg" title="SeleniumBase on YouTube" width="350" /></a>
+<!-- YouTube View --><a href="https://www.youtube.com/watch?v=-EpZlhGWo9k"><img src="http://img.youtube.com/vi/-EpZlhGWo9k/0.jpg" title="SeleniumBase on YouTube" width="320" /></a>
 <p>(<b><a href="https://www.youtube.com/watch?v=-EpZlhGWo9k">Watch the 3rd UC Mode tutorial on YouTube! ▶️</a></b>)</p>
 
 ----
 
-<!-- YouTube View --><a href="https://www.youtube.com/watch?v=Mr90iQmNsKM"><img src="http://img.youtube.com/vi/Mr90iQmNsKM/0.jpg" title="SeleniumBase on YouTube" width="350" /></a>
+<!-- YouTube View --><a href="https://www.youtube.com/watch?v=Mr90iQmNsKM"><img src="http://img.youtube.com/vi/Mr90iQmNsKM/0.jpg" title="SeleniumBase on YouTube" width="320" /></a>
 <p>(<b><a href="https://www.youtube.com/watch?v=Mr90iQmNsKM">Watch the 4th UC Mode tutorial on YouTube! ▶️</a></b>)</p>
 
 ----
@@ -104,7 +104,7 @@ Sometimes you need to add <code translate="no">incognito=True</code> with <code 
 ```python
 from seleniumbase import SB
 
-with SB(uc=True, test=True, incognito=True, locale_code="en") as sb:
+with SB(uc=True, test=True, incognito=True, locale="en") as sb:
     url = "https://ahrefs.com/website-authority-checker"
     input_field = 'input[placeholder="Enter domain"]'
     submit_button = 'span:contains("Check Authority")'

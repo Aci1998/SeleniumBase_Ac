@@ -5,7 +5,7 @@ import colorama
 import mycdp
 import sys
 import time
-from seleniumbase.undetected import cdp_driver
+from seleniumbase import cdp_driver
 
 xhr_requests = []
 last_xhr_request = None
@@ -58,15 +58,15 @@ async def receiveXHR(page, requests):
 
 
 async def crawl():
-    driver = await cdp_driver.cdp_util.start_async()
+    driver = await cdp_driver.start_async()
     tab = await driver.get("about:blank")
     listenXHR(tab)
 
     # Change url to something that makes ajax requests
     tab = await driver.get("https://learn.microsoft.com/en-us/")
     time.sleep(2)
-    for i in range(75):
-        await tab.scroll_down(3)
+    for i in range(20):
+        await tab.scroll_down(4)
         time.sleep(0.02)
 
     xhr_responses = await receiveXHR(tab, xhr_requests)
@@ -87,6 +87,5 @@ async def crawl():
 
 if __name__ == "__main__":
     print("<============= START: XHR Example =============>")
-    loop = asyncio.new_event_loop()
-    loop.run_until_complete(crawl())
+    asyncio.run(crawl())
     print("<============== END: XHR Example ==============>")

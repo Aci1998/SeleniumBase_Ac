@@ -1,6 +1,6 @@
 from seleniumbase import SB
 
-with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+with SB(uc=True, test=True, locale="en", ad_block=True) as sb:
     url = "https://www.easyjet.com/en/"
     sb.activate_cdp_mode(url)
     sb.sleep(2.5)
@@ -25,7 +25,7 @@ with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
     sb.cdp.click('[data-testid="month"]:last-of-type [aria-disabled="false"]')
     sb.sleep(1.2)
     sb.cdp.click('button[data-testid="submit"]')
-    sb.sleep(2.5)
+    sb.sleep(4.2)
     sb.connect()
     sb.sleep(1.2)
     for window in sb.driver.window_handles:

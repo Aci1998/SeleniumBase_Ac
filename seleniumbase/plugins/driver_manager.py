@@ -10,7 +10,7 @@ Example -->
 ```python
 from seleniumbase import DriverContext
 
-with DriverContext() as driver:
+with DriverContext(uc=True) as driver:
     driver.get("https://google.com/ncr")
 ```
 
@@ -30,7 +30,7 @@ Example -->
 ```python
 from seleniumbase import Driver
 
-driver = Driver()
+driver = Driver(uc=True)
 driver.get("https://google.com/ncr")
 ```
 
@@ -137,6 +137,8 @@ def Driver(
     guest=None,  # Shortcut / Duplicate of "guest_mode".
     wire=None,  # Shortcut / Duplicate of "use_wire".
     pls=None,  # Shortcut / Duplicate of "page_load_strategy".
+    cft=None,  # Use "Chrome for Testing"
+    chs=None,  # Use "Chrome-Headless-Shell"
 ):
     """
     * SeleniumBase Driver as a Python Context Manager or a returnable object. *
@@ -530,6 +532,42 @@ def Driver(
                 break
             count += 1
     user_agent = agent
+    found_bl = None
+    if binary_location is None and "--binary-location" in arg_join:
+        count = 0
+        for arg in sys_argv:
+            if arg.startswith("--binary-location="):
+                found_bl = arg.split("--binary-location=")[1]
+                break
+            elif arg == "--binary-location" and len(sys_argv) > count + 1:
+                found_bl = sys_argv[count + 1]
+                if found_bl.startswith("-"):
+                    found_bl = None
+                break
+            count += 1
+        if found_bl:
+            binary_location = found_bl
+    if binary_location is None and "--bl=" in arg_join:
+        for arg in sys_argv:
+            if arg.startswith("--bl="):
+                binary_location = arg.split("--bl=")[1]
+                break
+    if cft and not binary_location:
+        binary_location = "cft"
+    elif chs and not binary_location:
+        binary_location = "chs"
+    if "--cft" in sys_argv and not binary_location:
+        binary_location = "cft"
+    elif "--chs" in sys_argv and not binary_location:
+        binary_location = "chs"
+    if (
+        binary_location
+        and binary_location.lower() == "chs"
+        and browser == "chrome"
+    ):
+        headless = True
+        headless1 = False
+        headless2 = False
     recorder_mode = False
     if recorder_ext:
         recorder_mode = True

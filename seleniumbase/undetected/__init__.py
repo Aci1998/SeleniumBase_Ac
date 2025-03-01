@@ -25,6 +25,7 @@ __all__ = (
     "CDP",
     "find_chrome_executable",
 )
+IS_MAC = "darwin" in sys.platform
 IS_POSIX = sys.platform.startswith(("darwin", "cygwin", "linux"))
 logger = logging.getLogger("uc")
 logger.setLevel(logging.getLogger().getEffectiveLevel())
@@ -311,7 +312,21 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                 setattr(service_, "creationflags", creationflags)
             if hasattr(service_, "creation_flags"):
                 setattr(service_, "creation_flags", creationflags)
-            super().__init__(options=options, service=service_)
+            try:
+                super().__init__(options=options, service=service_)
+            except OSError as e:
+                if IS_MAC and "Bad CPU type in executable" in str(e):
+                    print(str(e))
+                    message = (
+                        "Missing a macOS dependency:\n"
+                        "Your Mac needs Rosetta 2 to use UC Mode!\n"
+                        'Run: "softwareupdate --install-rosetta"\n'
+                        "Info: "
+                        "https://apple.stackexchange.com/a/408379/607628"
+                    )
+                    raise Exception(message)
+                else:
+                    raise
             self.reactor = None
             if enable_cdp_events:
                 if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
@@ -437,14 +452,22 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                 self.service.start()
         with suppress(Exception):
             self.start_session()
+            time.sleep(0.0075)
         with suppress(Exception):
-            if self.current_url.startswith("chrome-extension://"):
-                self.close()
-                if self.service.is_connectable():
-                    self.stop_client()
-                    self.service.stop()
-                self.service.start()
-                self.start_session()
+            for window_handle in self.window_handles:
+                self.switch_to.window(window_handle)
+                if self.current_url.startswith(
+                    "chrome-extension://"
+                ):
+                    self.close()
+                    if self.service.is_connectable():
+                        self.stop_client()
+                        self.service.stop()
+                    self.service.start()
+                    self.start_session()
+                    time.sleep(0.003)
+        with suppress(Exception):
+            self.switch_to.window(self.window_handles[-1])
         self._is_connected = True
 
     def disconnect(self):
@@ -465,14 +488,22 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                 self.service.start()
         with suppress(Exception):
             self.start_session()
+            time.sleep(0.0075)
         with suppress(Exception):
-            if self.current_url.startswith("chrome-extension://"):
-                self.close()
-                if self.service.is_connectable():
-                    self.stop_client()
-                    self.service.stop()
-                self.service.start()
-                self.start_session()
+            for window_handle in self.window_handles:
+                self.switch_to.window(window_handle)
+                if self.current_url.startswith(
+                    "chrome-extension://"
+                ):
+                    self.close()
+                    if self.service.is_connectable():
+                        self.stop_client()
+                        self.service.stop()
+                    self.service.start()
+                    self.start_session()
+                    time.sleep(0.003)
+        with suppress(Exception):
+            self.switch_to.window(self.window_handles[-1])
         self._is_connected = True
 
     def start_session(self, capabilities=None):
@@ -561,14 +592,14 @@ def find_chrome_executable():
     if IS_POSIX:
         for item in os.environ.get("PATH").split(os.pathsep):
             for subitem in (
-                "chromium",
                 "google-chrome",
-                "chromium-browser",
-                "chrome",
                 "google-chrome-stable",
                 "google-chrome-beta",
                 "google-chrome-dev",
                 "google-chrome-unstable",
+                "chrome",
+                "chromium",
+                "chromium-browser",
             ):
                 candidates.add(os.sep.join((item, subitem)))
         if "darwin" in sys.platform:

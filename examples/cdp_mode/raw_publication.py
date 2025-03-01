@@ -1,6 +1,6 @@
 from seleniumbase import SB
 
-with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+with SB(uc=True, test=True, locale="en", ad_block=True) as sb:
     url = "https://www.researchgate.net/search/publication"
     sb.activate_cdp_mode(url)
     sb.sleep(2)
@@ -10,6 +10,7 @@ with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
     if sb.is_element_present(shadow_head):
         sb.cdp.gui_click_element(shadow_head)
         sb.sleep(1.5)
+    sb.cdp.click_if_visible('button[aria-label="Close"]')
     sb.cdp.remove_elements('div[class*="ad-container"]')
     sb.cdp.remove_elements("div.lite-page-ad")
     sb.sleep(0.5)

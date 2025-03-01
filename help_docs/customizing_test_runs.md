@@ -339,6 +339,24 @@ The above not only runs tests in parallel processes, but it also tells tests in 
 
 --------
 
+🎛️ For extra speed, run your tests using `chrome-headless-shell`:
+
+First, get `chrome-headless-shell` if you don't already have it:
+
+```bash
+sbase get chs
+```
+
+Then, run scripts with `--chs` / `chs=True`:
+
+```bash
+pytest --chs -n8 --dashboard --html=report.html -v --rs
+```
+
+That makes your tests run very quickly in headless mode.
+
+--------
+
 <h3><img src="https://seleniumbase.github.io/img/green_logo.png" title="SeleniumBase" width="32" /> The SeleniumBase Dashboard:</h3>
 
 🔵 The ``--dashboard`` option for pytest generates a SeleniumBase Dashboard located at ``dashboard.html``, which updates automatically as tests run and produce results. Example:
@@ -446,6 +464,47 @@ The `VER` in `--driver-version=VER` can be:
 * ``"mlatest"`` (latest version for the milestone)
 
 Note that different options could lead to the same result. (Eg. If you have the latest version of a browser for a milestone, then ``"browser"`` and ``"mlatest"`` should give you the same driver if the latest driver version for that milestone matches the browser version.)
+
+--------
+
+<h3><img src="https://seleniumbase.github.io/img/green_logo.png" title="SeleniumBase" width="32" /> Setting the binary location:</h3>
+
+🔵 By default, SeleniumBase uses the browser binary detected on the System PATH.
+
+🎛️ To change this default behavior, you can use:
+
+```bash
+pytest --binary-location=PATH
+```
+
+The `PATH` in `--binary-location=PATH` / `--bl=PATH` can be:
+* A relative or exact path to the browser binary.
+* `"cft"` as a special option for `Chrome for Testing`.
+* `"chs"` as a special option for `Chrome-Headless-Shell`.
+
+Before using the `"cft"` / `"chs"` options, call `sbase get cft` / `sbase get chs` in order to download the specified binaries into the `seleniumbase/drivers` folder. The default version is the latest stable version on https://googlechromelabs.github.io/chrome-for-testing/. You can change that by specifying the arg as a parameter. (Eg. `sbase get cft 131`, `sbase get chs 132`, etc.)
+
+With the `SB()` and `Driver()` formats, the binary location is set via the `binary_location` parameter.
+
+--------
+
+🎛️ To use the special `Chrome for Testing` binary:
+
+```bash
+sbase get cft
+```
+
+Then, run scripts with `--cft` / `cft=True`:
+
+```bash
+pytest --cft -n8 --dashboard --html=report.html -v --rs --headless
+```
+
+--------
+
+(Note that `--chs` / `chs=True` activates `Chrome-Headless-Shell`)
+
+`Chrome-Headless-Shell` is the fastest version of Chrome, designed specifically for headless automation. (This mode is NOT compatible with UC Mode!)
 
 --------
 

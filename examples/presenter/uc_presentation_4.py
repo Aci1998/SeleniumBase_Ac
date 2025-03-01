@@ -352,7 +352,7 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en") as sb:
+        with SB(uc=True, test=True, locale="en") as sb:
             url = "www.planetminecraft.com/account/sign_in/"
             sb.activate_cdp_mode(url)
             sb.sleep(2)
@@ -367,7 +367,7 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en") as sb:
+        with SB(uc=True, test=True, locale="en") as sb:
             url = "https://www.cloudflare.com/login"
             sb.activate_cdp_mode(url)
             sb.sleep(3)
@@ -382,7 +382,7 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en") as sb:
+        with SB(uc=True, test=True, locale="en") as sb:
             url = "https://gitlab.com/users/sign_in"
             sb.activate_cdp_mode(url)
             sb.sleep(2)
@@ -433,7 +433,7 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en") as sb:
+        with SB(uc=True, test=True, locale="en") as sb:
             url = "https://www.bing.com/turing/captcha/challenge"
             sb.activate_cdp_mode(url)
             sb.sleep(1)
@@ -458,7 +458,7 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+        with SB(uc=True, test=True, locale="en", ad_block=True) as sb:
             url = "https://www.pokemon.com/us"
             sb.activate_cdp_mode(url)
             sb.sleep(3.2)
@@ -516,17 +516,19 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+        with SB(uc=True, test=True, ad_block=True) as sb:
             url = "https://www.walmart.com/"
             sb.activate_cdp_mode(url)
             sb.sleep(2.5)
+            sb.cdp.click_if_visible('[data-automation-id*="close-mark"]')
             sb.cdp.mouse_click('input[aria-label="Search"]')
             sb.sleep(1.2)
             search = "Settlers of Catan Board Game"
             required_text = "Catan"
             sb.cdp.press_keys('input[aria-label="Search"]', search + "\n")
             sb.sleep(3.8)
-            print('\n\n*** Walmart Search for "%s":' % search)
+            sb.cdp.remove_elements('[data-testid="skyline-ad"]')
+            print('*** Walmart Search for "%s":' % search)
             print('    (Results must contain "%s".)' % required_text)
             unique_item_text = []
             items = sb.cdp.find_elements('div[data-testid="list-view"]')
@@ -563,7 +565,7 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en") as sb:
+        with SB(uc=True, test=True, locale="en") as sb:
             url = "https://www.albertsons.com/recipes/"
             sb.activate_cdp_mode(url)
             sb.sleep(2.5)
@@ -609,7 +611,7 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+        with SB(uc=True, test=True, locale="en", ad_block=True) as sb:
             url = "https://www.easyjet.com/en/"
             sb.activate_cdp_mode(url)
             sb.sleep(2.5)
@@ -642,7 +644,7 @@ class UCPresentationClass(BaseCase):
             sb.cdp.click('button[data-testid="submit"]')
             sb.sleep(3.5)
             sb.connect()
-            sb.sleep(2.5)
+            sb.sleep(4.2)
             for window in sb.driver.window_handles:
                 sb.switch_to_window(window)
                 if "/buy/flights" in sb.get_current_url():
@@ -676,7 +678,7 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+        with SB(uc=True, test=True, locale="en", ad_block=True) as sb:
             url = "https://www.hyatt.com/"
             sb.activate_cdp_mode(url)
             sb.sleep(2.5)
@@ -708,6 +710,7 @@ class UCPresentationClass(BaseCase):
                 if "Avg/Night" in info and not info.startswith("Rates from"):
                     name = info.split("  (")[0]
                     name = name.split(" + ")[0].split(" Award Cat")[0]
+                    name = name.split(" Rates from :")[0]
                     price = "?"
                     if "Rates from : " in info:
                         price = info.split("Rates from : ")[1]
@@ -724,11 +727,11 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+        with SB(uc=True, test=True, locale="en", ad_block=True) as sb:
             url = "https://www.bestwestern.com/en_US.html"
             sb.activate_cdp_mode(url)
             sb.sleep(2.5)
-            sb.cdp.click_if_visible("div.onetrust-close-btn-handler")
+            sb.cdp.click_if_visible(".onetrust-close-btn-handler")
             sb.sleep(1)
             sb.cdp.click("input#destination-input")
             sb.sleep(2)
@@ -741,9 +744,11 @@ class UCPresentationClass(BaseCase):
             sb.sleep(4)
             sb.cdp.click("label#available-label")
             sb.sleep(2.5)
-            print("\n\nBest Western Hotels in %s:" % location)
+            print("Best Western Hotels in %s:" % location)
             summary_details = sb.cdp.get_text("#summary-details-column")
-            dates = summary_details.split("ROOM")[0].split("DATES")[-1].strip()
+            dates = summary_details.split("DESTINATION")[-1]
+            dates = dates.split(" CHECK-OUT")[0].strip() + " CHECK-OUT"
+            dates = dates.replace("  ", " ")
             print("(Dates: %s)" % dates)
             flip_cards = sb.cdp.select_all(".flipCard")
             for i, flip_card in enumerate(flip_cards):
@@ -764,7 +769,7 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+        with SB(uc=True, test=True, locale="en", ad_block=True) as sb:
             window_handle = sb.driver.current_window_handle
             url = "https://www.priceline.com"
             sb.activate_cdp_mode(url)
@@ -791,7 +796,7 @@ class UCPresentationClass(BaseCase):
             sb.sleep(0.8)
             for y in range(1, 9):
                 sb.scroll_to_y(y * 400)
-                sb.sleep(1.25)
+                sb.sleep(0.75)
             hotel_names = sb.find_elements(
                 'a[data-autobot-element-id*="HOTEL_NAME"]'
             )
@@ -833,11 +838,11 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+        with SB(uc=True, test=True, locale="en", pls="none") as sb:
             url = "https://www.nike.com/"
             sb.activate_cdp_mode(url)
             sb.sleep(2.5)
-            sb.cdp.gui_click_element('div[data-testid="user-tools-container"]')
+            sb.cdp.click('div[data-testid="user-tools-container"]')
             sb.sleep(1.5)
             search = "Nike Air Force 1"
             sb.cdp.press_keys('input[type="search"]', search)
@@ -861,7 +866,7 @@ class UCPresentationClass(BaseCase):
         )
         self.begin_presentation(filename="uc_presentation.html")
 
-        with SB(uc=True, test=True, locale_code="en") as sb:
+        with SB(uc=True, test=True, locale="en") as sb:
             url = "https://www.nordstrom.com/"
             sb.activate_cdp_mode(url)
             sb.sleep(2.2)

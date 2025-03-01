@@ -1,6 +1,6 @@
 from seleniumbase import SB
 
-with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
+with SB(uc=True, test=True, locale="en", ad_block=True) as sb:
     url = "https://www.hyatt.com/"
     sb.activate_cdp_mode(url)
     sb.sleep(2.5)
@@ -29,6 +29,7 @@ with SB(uc=True, test=True, locale_code="en", ad_block=True) as sb:
         info = hotel.text.strip()
         if "Avg/Night" in info and not info.startswith("Rates from"):
             name = info.split("  (")[0].split(" + ")[0].split(" Award Cat")[0]
+            name = name.split(" Rates from :")[0]
             price = "?"
             if "Rates from : " in info:
                 price = info.split("Rates from : ")[1].split(" Avg/Night")[0]

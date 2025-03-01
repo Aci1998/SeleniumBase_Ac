@@ -4,12 +4,15 @@ import asyncio
 import fasteners
 import logging
 import os
+import sys
 import time
 import types
 import typing
 from contextlib import suppress
 from seleniumbase import config as sb_config
 from seleniumbase.config import settings
+from seleniumbase.core import detect_b_ver
+from seleniumbase.core import proxy_helper
 from seleniumbase.fixtures import constants
 from seleniumbase.fixtures import shared_utils
 from typing import Optional, List, Union, Callable
@@ -22,6 +25,7 @@ import mycdp as cdp
 
 logger = logging.getLogger(__name__)
 IS_LINUX = shared_utils.is_linux()
+PROXY_DIR_LOCK = proxy_helper.PROXY_DIR_LOCK
 T = typing.TypeVar("T")
 
 
@@ -84,6 +88,9 @@ def __activate_virtual_display_as_needed(
                             "\nX11 display failed! Will use regular xvfb!"
                         )
                         __activate_standard_virtual_display()
+                    else:
+                        sb_config._virtual_display = _xvfb_display
+                        sb_config.headless_active = True
                 except Exception as e:
                     if hasattr(e, "msg"):
                         print("\n" + str(e.msg))
@@ -135,6 +142,85 @@ def __activate_virtual_display_as_needed(
                 __activate_standard_virtual_display()
 
 
+def __set_proxy_filenames():
+    DOWNLOADS_DIR = constants.Files.DOWNLOADS_FOLDER
+    for num in range(1000):
+        PROXY_DIR_PATH = os.path.join(DOWNLOADS_DIR, "proxy_ext_dir_%s" % num)
+        if os.path.exists(PROXY_DIR_PATH):
+            continue
+        proxy_helper.PROXY_DIR_PATH = PROXY_DIR_PATH
+        return
+    # Exceeded upper bound. Use Defaults:
+    PROXY_DIR_PATH = os.path.join(DOWNLOADS_DIR, "proxy_ext_dir")
+    proxy_helper.PROXY_DIR_PATH = PROXY_DIR_PATH
+
+
+def __add_chrome_ext_dir(extension_dir, dir_path):
+    # Add dir_path to the existing extension_dir
+    option_exists = False
+    if extension_dir:
+        option_exists = True
+        extension_dir = "%s,%s" % (
+            extension_dir, os.path.realpath(dir_path)
+        )
+    if not option_exists:
+        extension_dir = os.path.realpath(dir_path)
+    return extension_dir
+
+
+def __add_chrome_proxy_extension(
+    extension_dir,
+    proxy_string,
+    proxy_user,
+    proxy_pass,
+    proxy_bypass_list=None,
+    multi_proxy=False,
+):
+    """Implementation of https://stackoverflow.com/a/35293284/7058266
+    for https://stackoverflow.com/q/12848327/7058266
+    (Run Selenium on a proxy server that requires authentication.)"""
+    args = " ".join(sys.argv)
+    bypass_list = proxy_bypass_list
+    if (
+        not ("-n" in sys.argv or " -n=" in args or args == "-c")
+        and not multi_proxy
+    ):
+        # Single-threaded
+        proxy_dir_lock = fasteners.InterProcessLock(PROXY_DIR_LOCK)
+        with proxy_dir_lock:
+            proxy_helper.create_proxy_ext(
+                proxy_string,
+                proxy_user,
+                proxy_pass,
+                bypass_list,
+                zip_it=False,
+            )
+            proxy_dir_path = proxy_helper.PROXY_DIR_PATH
+            extension_dir = __add_chrome_ext_dir(
+                extension_dir, proxy_dir_path
+            )
+    else:
+        # Multi-threaded
+        proxy_dir_lock = fasteners.InterProcessLock(PROXY_DIR_LOCK)
+        with proxy_dir_lock:
+            with suppress(Exception):
+                shared_utils.make_writable(PROXY_DIR_LOCK)
+            if multi_proxy:
+                __set_proxy_filenames()
+            if not os.path.exists(proxy_helper.PROXY_DIR_PATH):
+                proxy_helper.create_proxy_ext(
+                    proxy_string,
+                    proxy_user,
+                    proxy_pass,
+                    bypass_list,
+                    zip_it=False,
+                )
+            extension_dir = __add_chrome_ext_dir(
+                extension_dir, proxy_helper.PROXY_DIR_PATH
+            )
+    return extension_dir
+
+
 async def start(
     config: Optional[Config] = None,
     *,
@@ -146,12 +232,14 @@ async def start(
     browser_args: Optional[List[str]] = None,
     xvfb_metrics: Optional[List[str]] = None,  # "Width,Height" for Linux
     sandbox: Optional[bool] = True,
-    lang: Optional[str] = None,
-    host: Optional[str] = None,
-    port: Optional[int] = None,
+    lang: Optional[str] = None,  # Set the Language Locale Code
+    host: Optional[str] = None,  # Chrome remote-debugging-host
+    port: Optional[int] = None,  # Chrome remote-debugging-port
     xvfb: Optional[int] = None,  # Use a special virtual display on Linux
     headed: Optional[bool] = None,  # Override default Xvfb mode on Linux
     expert: Optional[bool] = None,  # Open up closed Shadow-root elements
+    proxy: Optional[str] = None,  # "host:port" or "user:pass@host:port"
+    extension_dir: Optional[str] = None,  # Chrome extension directory
     **kwargs: Optional[dict],
 ) -> Browser:
     """
@@ -196,6 +284,18 @@ async def start(
     if IS_LINUX and not headless and not headed and not xvfb:
         xvfb = True  # The default setting on Linux
     __activate_virtual_display_as_needed(headless, headed, xvfb, xvfb_metrics)
+    if proxy and "@" in str(proxy):
+        user_with_pass = proxy.split("@")[0]
+        if ":" in user_with_pass:
+            proxy_user = user_with_pass.split(":")[0]
+            proxy_pass = user_with_pass.split(":")[1]
+            proxy_string = proxy.split("@")[1]
+            extension_dir = __add_chrome_proxy_extension(
+                extension_dir,
+                proxy_string,
+                proxy_user,
+                proxy_pass,
+            )
     if not config:
         config = Config(
             user_data_dir,
@@ -209,13 +309,27 @@ async def start(
             host=host,
             port=port,
             expert=expert,
+            proxy=proxy,
+            extension_dir=extension_dir,
             **kwargs,
         )
+    driver = None
     try:
-        return await Browser.create(config)
+        driver = await Browser.create(config)
     except Exception:
         time.sleep(0.15)
-        return await Browser.create(config)
+        driver = await Browser.create(config)
+    if proxy and "@" in str(proxy):
+        time.sleep(0.15)
+    if lang:
+        sb_config._cdp_locale = lang
+    elif "locale" in kwargs:
+        sb_config._cdp_locale = kwargs["locale"]
+    elif "locale_code" in kwargs:
+        sb_config._cdp_locale = kwargs["locale_code"]
+    else:
+        sb_config._cdp_locale = None
+    return driver
 
 
 async def start_async(*args, **kwargs) -> Browser:
@@ -223,7 +337,15 @@ async def start_async(*args, **kwargs) -> Browser:
     binary_location = None
     if "browser_executable_path" in kwargs:
         binary_location = kwargs["browser_executable_path"]
-    if shared_utils.is_chrome_130_or_newer(binary_location):
+    else:
+        binary_location = detect_b_ver.get_binary_location("google-chrome")
+        if binary_location and not os.path.exists(binary_location):
+            binary_location = None
+    if (
+        shared_utils.is_chrome_130_or_newer(binary_location)
+        and "user_data_dir" in kwargs
+        and kwargs["user_data_dir"]
+    ):
         if "headless" in kwargs:
             headless = kwargs["headless"]
         decoy_args = kwargs
@@ -238,12 +360,28 @@ async def start_async(*args, **kwargs) -> Browser:
 
 
 def start_sync(*args, **kwargs) -> Browser:
-    loop = asyncio.get_event_loop()
+    loop = None
+    if (
+        "loop" in kwargs
+        and kwargs["loop"]
+        and hasattr(kwargs["loop"], "create_task")
+    ):
+        loop = kwargs["loop"]
+    else:
+        loop = asyncio.new_event_loop()
     headless = False
     binary_location = None
     if "browser_executable_path" in kwargs:
         binary_location = kwargs["browser_executable_path"]
-    if shared_utils.is_chrome_130_or_newer(binary_location):
+    else:
+        binary_location = detect_b_ver.get_binary_location("google-chrome")
+        if binary_location and not os.path.exists(binary_location):
+            binary_location = None
+    if (
+        shared_utils.is_chrome_130_or_newer(binary_location)
+        and "user_data_dir" in kwargs
+        and kwargs["user_data_dir"]
+    ):
         if "headless" in kwargs:
             headless = kwargs["headless"]
         decoy_args = kwargs

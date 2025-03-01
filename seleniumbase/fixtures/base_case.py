@@ -95,6 +95,7 @@ logging.getLogger("requests").setLevel(logging.ERROR)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
 urllib3.disable_warnings()
 LOGGER.setLevel(logging.WARNING)
+is_linux = shared_utils.is_linux()
 is_windows = shared_utils.is_windows()
 python3_11_or_newer = False
 if sys.version_info >= (3, 11):
@@ -1453,6 +1454,8 @@ class BaseCase(unittest.TestCase):
 
     def is_text_visible(self, text, selector="body", by="css selector"):
         """Returns whether the text substring is visible in the element."""
+        if self.__is_cdp_swap_needed():
+            return self.cdp.is_text_visible(text, selector)
         self.wait_for_ready_state_complete()
         time.sleep(0.01)
         selector, by = self.__recalculate_selector(selector, by)
@@ -1463,6 +1466,8 @@ class BaseCase(unittest.TestCase):
     def is_exact_text_visible(self, text, selector="body", by="css selector"):
         """Returns whether the text is exactly equal to the element text.
         (Leading and trailing whitespace is ignored in the verification.)"""
+        if self.__is_cdp_swap_needed():
+            return self.cdp.is_exact_text_visible(text, selector)
         self.wait_for_ready_state_complete()
         time.sleep(0.01)
         selector, by = self.__recalculate_selector(selector, by)
@@ -1901,7 +1906,7 @@ class BaseCase(unittest.TestCase):
             timeout = self.__get_new_timeout(timeout)
         selector, by = self.__recalculate_selector(selector, by)
         if self.__is_cdp_swap_needed():
-            return self.cdp.get_element_attribute(selector)
+            return self.cdp.get_element_attribute(selector, attribute)
         self.wait_for_ready_state_complete()
         time.sleep(0.01)
         if self.__is_shadow_selector(selector):
@@ -2070,6 +2075,19 @@ class BaseCase(unittest.TestCase):
             self.cdp.internalize_links()
             return
         self.set_attributes('[target="_blank"]', "target", "_self")
+
+    def get_parent(self, element, by="css selector", timeout=None):
+        """Returns the parent element.
+        If element is a string, then finds element first via selector."""
+        if self.__is_cdp_swap_needed():
+            return self.cdp.get_parent(element)
+        if isinstance(element, str):
+            if not timeout:
+                timeout = settings.LARGE_TIMEOUT
+            element = self.wait_for_element_present(
+                element, by=by, timeout=timeout
+            )
+        return element.find_element(by="xpath", value="..")
 
     def get_property(
         self, selector, property, by="css selector", timeout=None
@@ -2493,8 +2511,10 @@ class BaseCase(unittest.TestCase):
         kind = self.get_attribute(selector, "type", by=by, timeout=timeout)
         if kind != "checkbox" and kind != "radio":
             raise Exception("Expecting a checkbox or a radio button element!")
-        return self.get_attribute(
-            selector, "checked", by=by, timeout=timeout, hard_fail=False
+        return bool(
+            self.get_attribute(
+                selector, "checked", by=by, timeout=timeout, hard_fail=False
+            )
         )
 
     def is_selected(self, selector, by="css selector", timeout=None):
@@ -3253,7 +3273,7 @@ class BaseCase(unittest.TestCase):
         html_string = "\n".join(new_lines)
         soup = self.get_beautiful_soup(html_string)
         found_base = False
-        links = soup.findAll("link")
+        links = soup.find_all("link")
         href = None
         for link in links:
             if link.get("rel") == ["canonical"] and link.get("href"):
@@ -3269,7 +3289,7 @@ class BaseCase(unittest.TestCase):
                 "<head>", '<head><base href="%s">' % href
             )
         elif not found_base:
-            bases = soup.findAll("base")
+            bases = soup.find_all("base")
             for base in bases:
                 if base.get("href"):
                     href = base.get("href")
@@ -3277,7 +3297,7 @@ class BaseCase(unittest.TestCase):
             html_string = html_string.replace('base: "."', 'base: "%s"' % href)
 
         soup = self.get_beautiful_soup(html_string)
-        scripts = soup.findAll("script")
+        scripts = soup.find_all("script")
         for script in scripts:
             if script.get("type") != "application/json":
                 html_string = html_string.replace(str(script), "")
@@ -3415,6 +3435,14 @@ class BaseCase(unittest.TestCase):
         if not js_utils.is_jquery_activated(self.driver):
             self.activate_jquery()
         return self.driver.execute_script(script, *args, **kwargs)
+
+    def get_element_at_x_y(self, x, y):
+        """Return element at current window's x,y coordinates."""
+        self.__check_scope()
+        self._check_browser()
+        return self.execute_script(
+            "return document.elementFromPoint(%s, %s);" % (x, y)
+        )
 
     def get_gui_element_rect(self, selector, by="css selector"):
         """Very similar to element.rect, but the x, y coordinates are
@@ -4347,6 +4375,8 @@ class BaseCase(unittest.TestCase):
         self.driver = driver
         if self.driver in self._drivers_browser_map:
             self.browser = self._drivers_browser_map[self.driver]
+        if self.__is_cdp_swap_needed():
+            self.cdp._swap_driver(self.driver)
         self.bring_active_window_to_front()
 
     def switch_to_default_driver(self):
@@ -4355,6 +4385,8 @@ class BaseCase(unittest.TestCase):
         self.driver = self._default_driver
         if self.driver in self._drivers_browser_map:
             self.browser = self._drivers_browser_map[self.driver]
+        if self.__is_cdp_swap_needed():
+            self.cdp._swap_driver(self.driver)
         self.bring_active_window_to_front()
 
     def save_screenshot(
@@ -4484,7 +4516,8 @@ class BaseCase(unittest.TestCase):
         @Params
         name - The file name to save the current page's HTML to.
         folder - The folder to save the file to. (Default = current folder)"""
-        self.wait_for_ready_state_complete()
+        if not self.__is_cdp_swap_needed():
+            self.wait_for_ready_state_complete()
         return page_actions.save_page_source(self.driver, name, folder)
 
     def save_cookies(self, name="cookies.txt"):
@@ -4542,6 +4575,9 @@ class BaseCase(unittest.TestCase):
     def delete_all_cookies(self):
         """Deletes all cookies in the web browser.
         Does NOT delete the saved cookies file."""
+        if self.__is_cdp_swap_needed():
+            self.cdp.clear_cookies()
+            return
         self.wait_for_ready_state_complete()
         self.driver.delete_all_cookies()
         if self.recorder_mode:
@@ -4553,7 +4589,6 @@ class BaseCase(unittest.TestCase):
     def delete_saved_cookies(self, name="cookies.txt"):
         """Deletes the cookies file from the "saved_cookies" folder.
         Does NOT delete the cookies from the web browser."""
-        self.wait_for_ready_state_complete()
         if name.endswith("/"):
             raise Exception("Invalid filename for Cookies!")
         if "/" in name:
@@ -4592,14 +4627,20 @@ class BaseCase(unittest.TestCase):
         return json.loads(json_cookies)
 
     def get_cookie(self, name):
+        self.__check_scope()
+        self._check_browser()
         return self.driver.get_cookie(name)
 
     def get_cookies(self):
+        self.__check_scope()
+        self._check_browser()
         return self.driver.get_cookies()
 
     def get_cookie_string(self):
+        self.__check_scope()
         if self.__is_cdp_swap_needed():
             return self.cdp.get_cookie_string()
+        self._check_browser()
         return self.execute_script("return document.cookie;")
 
     def add_cookie(self, cookie_dict, expiry=False):
@@ -4614,6 +4655,8 @@ class BaseCase(unittest.TestCase):
         If expiry > 0: Set "expiry" to expiry minutes in the future.
         If expiry == True: Set "expiry" to 24 hours in the future.
         """
+        self.__check_scope()
+        self._check_browser()
         cookie = cookie_dict
         if "domain" in cookie:
             origin = self.get_origin()
@@ -4638,6 +4681,8 @@ class BaseCase(unittest.TestCase):
         If expiry > 0: Set "expiry" to expiry minutes in the future.
         If expiry == True: Set "expiry" to 24 hours in the future.
         """
+        self.__check_scope()
+        self._check_browser()
         origin = self.get_origin()
         trim_origin = origin.split("://")[-1]
         for cookie in cookies:
@@ -4807,7 +4852,7 @@ class BaseCase(unittest.TestCase):
         from seleniumbase.js_code.recorder_js import recorder_js
 
         if not self.is_chromium():
-            if "linux" not in sys.platform:
+            if not is_linux:
                 c1 = colorama.Fore.BLUE + colorama.Back.LIGHTCYAN_EX
                 c2 = colorama.Fore.BLUE + colorama.Back.LIGHTGREEN_EX
                 cr = colorama.Style.RESET_ALL
@@ -5637,7 +5682,7 @@ class BaseCase(unittest.TestCase):
         c1 = ""
         c2 = ""
         cr = ""
-        if "linux" not in sys.platform:
+        if not is_linux:
             c1 = colorama.Fore.RED + colorama.Back.LIGHTYELLOW_EX
             c2 = colorama.Fore.LIGHTRED_EX + colorama.Back.LIGHTYELLOW_EX
             cr = colorama.Style.RESET_ALL
@@ -5739,7 +5784,7 @@ class BaseCase(unittest.TestCase):
         c1 = ""
         c2 = ""
         cr = ""
-        if "linux" not in sys.platform:
+        if not is_linux:
             c1 = colorama.Fore.RED + colorama.Back.LIGHTYELLOW_EX
             c2 = colorama.Fore.LIGHTRED_EX + colorama.Back.LIGHTYELLOW_EX
             cr = colorama.Style.RESET_ALL
@@ -9079,7 +9124,7 @@ class BaseCase(unittest.TestCase):
         original_selector = selector
         selector, by = self.__recalculate_selector(selector, by)
         if self.__is_cdp_swap_needed():
-            self.cdp.assert_element_absent(selector)
+            self.cdp.wait_for_element_absent(selector, timeout=timeout)
             return True
         return page_actions.wait_for_element_absent(
             self.driver,
@@ -9240,7 +9285,8 @@ class BaseCase(unittest.TestCase):
                     "bottom_left", "bottom_center", "bottom_right"]
         max_messages: The limit of concurrent messages to display."""
         self.__check_scope()
-        self._check_browser()
+        if not self.__is_cdp_swap_needed():
+            self._check_browser()
         if not theme:
             theme = "default"  # "flat"
         if not location:
@@ -9267,7 +9313,8 @@ class BaseCase(unittest.TestCase):
         You can also post messages by using =>
             self.execute_script('Messenger().post("My Message")') """
         self.__check_scope()
-        self._check_browser()
+        if not self.__is_cdp_swap_needed():
+            self._check_browser()
         if style not in ["info", "success", "error"]:
             style = "info"
         if not duration:
@@ -9538,7 +9585,7 @@ class BaseCase(unittest.TestCase):
             self.assert_elements_present(selector, by=by, timeout=timeout)
             return True
         if self.__is_cdp_swap_needed():
-            self.cdp.assert_element_present(selector)
+            self.cdp.assert_element_present(selector, timeout=timeout)
             return True
         if self.__is_shadow_selector(selector):
             self.__assert_shadow_element_present(selector)
@@ -9615,7 +9662,7 @@ class BaseCase(unittest.TestCase):
         if self.timeout_multiplier and timeout == settings.SMALL_TIMEOUT:
             timeout = self.__get_new_timeout(timeout)
         if self.__is_cdp_swap_needed():
-            self.cdp.assert_element(selector)
+            self.cdp.assert_element(selector, timeout=timeout)
             return True
         if isinstance(selector, list):
             self.assert_elements(selector, by=by, timeout=timeout)
@@ -9908,7 +9955,7 @@ class BaseCase(unittest.TestCase):
                         messenger_post, selector, by
                     )
         elif self.__is_cdp_swap_needed():
-            self.cdp.assert_text(text, selector)
+            self.cdp.assert_text(text, selector, timeout=timeout)
             return True
         elif not self.is_connected():
             self.connect()
@@ -9958,7 +10005,7 @@ class BaseCase(unittest.TestCase):
         original_selector = selector
         selector, by = self.__recalculate_selector(selector, by)
         if self.__is_cdp_swap_needed():
-            self.cdp.assert_exact_text(text, selector)
+            self.cdp.assert_exact_text(text, selector, timeout=timeout)
             return True
         if self.__is_shadow_selector(selector):
             self.__assert_exact_shadow_text_visible(text, selector, timeout)
@@ -10198,6 +10245,9 @@ class BaseCase(unittest.TestCase):
             timeout = self.__get_new_timeout(timeout)
         original_selector = selector
         selector, by = self.__recalculate_selector(selector, by)
+        if self.__is_cdp_swap_needed():
+            self.cdp.wait_for_element_absent(selector, timeout=timeout)
+            return True
         return page_actions.wait_for_element_absent(
             self.driver,
             selector,
@@ -10220,7 +10270,7 @@ class BaseCase(unittest.TestCase):
         if self.timeout_multiplier and timeout == settings.SMALL_TIMEOUT:
             timeout = self.__get_new_timeout(timeout)
         if self.__is_cdp_swap_needed():
-            self.cdp.assert_element_absent(selector)
+            self.cdp.assert_element_absent(selector, timeout=timeout)
             return True
         self.wait_for_element_absent(selector, by=by, timeout=timeout)
         return True
@@ -10241,7 +10291,7 @@ class BaseCase(unittest.TestCase):
         original_selector = selector
         selector, by = self.__recalculate_selector(selector, by)
         if self.__is_cdp_swap_needed():
-            self.cdp.assert_element_not_visible(selector)
+            self.cdp.wait_for_element_not_visible(selector, timeout=timeout)
             return True
         return page_actions.wait_for_element_not_visible(
             self.driver,
@@ -10263,7 +10313,7 @@ class BaseCase(unittest.TestCase):
         if self.timeout_multiplier and timeout == settings.SMALL_TIMEOUT:
             timeout = self.__get_new_timeout(timeout)
         if self.__is_cdp_swap_needed():
-            self.cdp.assert_element_not_visible(selector)
+            self.cdp.assert_element_not_visible(selector, timeout=timeout)
             return True
         self.wait_for_element_not_visible(selector, by=by, timeout=timeout)
         if self.recorder_mode and self.__current_url_is_recordable():
@@ -10285,6 +10335,10 @@ class BaseCase(unittest.TestCase):
         if self.timeout_multiplier and timeout == settings.LARGE_TIMEOUT:
             timeout = self.__get_new_timeout(timeout)
         selector, by = self.__recalculate_selector(selector, by)
+        if self.__is_cdp_swap_needed():
+            return self.cdp.wait_for_text(
+                text, selector=selector, timeout=timeout
+            )
         return page_actions.wait_for_text_not_visible(
             self.driver, text, selector, by, timeout
         )
@@ -13774,7 +13828,8 @@ class BaseCase(unittest.TestCase):
             if self.get_current_url() == "about:blank":
                 self.switch_to_window(current_window)
         except Exception:
-            self.switch_to_window(current_window)
+            with suppress(Exception):
+                self.switch_to_window(current_window)
 
     def __needs_minimum_wait(self):
         if (
@@ -13867,7 +13922,8 @@ class BaseCase(unittest.TestCase):
         js_utils.highlight_element_with_js(self.driver, element, loops, o_bs)
 
     def __highlight_with_jquery(self, selector, loops, o_bs):
-        self.wait_for_ready_state_complete()
+        if not self.__is_cdp_swap_needed():
+            self.wait_for_ready_state_complete()
         js_utils.highlight_with_jquery(self.driver, selector, loops, o_bs)
 
     def __highlight_with_js_2(self, message, selector, o_bs):
@@ -13983,9 +14039,13 @@ class BaseCase(unittest.TestCase):
                 visible=0, size=(width, height)
             )
             self._xvfb_display.start()
-            sb_config._virtual_display = self._xvfb_display
             self.headless_active = True
-            sb_config.headless_active = True
+            if not self.undetectable:
+                sb_config._virtual_display = self._xvfb_display
+                sb_config.headless_active = True
+            if self._reuse_session and hasattr(sb_config, "_vd_list"):
+                if isinstance(sb_config._vd_list, list):
+                    sb_config._vd_list.append(self._xvfb_display)
 
     def __activate_virtual_display(self):
         if self.undetectable and not (self.headless or self.headless2):
@@ -14008,6 +14068,11 @@ class BaseCase(unittest.TestCase):
                         "\nX11 display failed! Will use regular xvfb!"
                     )
                     self.__activate_standard_virtual_display()
+                else:
+                    self.headless_active = True
+                    if self._reuse_session and hasattr(sb_config, "_vd_list"):
+                        if isinstance(sb_config._vd_list, list):
+                            sb_config._vd_list.append(self._xvfb_display)
             except Exception as e:
                 if hasattr(e, "msg"):
                     print("\n" + str(e.msg))
@@ -14062,7 +14127,7 @@ class BaseCase(unittest.TestCase):
         """This is only needed on Linux.
         The "--xvfb" arg is still useful, as it prevents headless mode,
         which is the default mode on Linux unless using another arg."""
-        if "linux" in sys.platform and (not self.headed or self.xvfb):
+        if is_linux and (not self.headed or self.xvfb):
             pip_find_lock = fasteners.InterProcessLock(
                 constants.PipInstall.FINDLOCK
             )
@@ -15134,9 +15199,12 @@ class BaseCase(unittest.TestCase):
                             self.driver.close()
                         self.switch_to_window(0)
                     if self._crumbs:
-                        self.wait_for_ready_state_complete()
-                        with suppress(Exception):
-                            self.driver.delete_all_cookies()
+                        if self.binary_location == "chs":
+                            self.delete_session_storage()
+                        else:
+                            self.wait_for_ready_state_complete()
+                            with suppress(Exception):
+                                self.driver.delete_all_cookies()
         if self._reuse_session and sb_config.shared_driver and has_url:
             good_start_page = False
             if self.recorder_ext:
@@ -16579,12 +16647,38 @@ class BaseCase(unittest.TestCase):
             # (Pynose / Behave / Pure Python) Close all open browser windows
             self.__quit_all_drivers()
         # Resume tearDown() for all test runners, (Pytest / Pynose / Behave)
-        if hasattr(self, "_xvfb_display") and self._xvfb_display:
+        if (
+            hasattr(self, "_xvfb_display")
+            and self._xvfb_display
+            and not self._reuse_session
+        ):
+            # Stop the Xvfb virtual display launched from BaseCase
             try:
                 if hasattr(self._xvfb_display, "stop"):
                     self._xvfb_display.stop()
                 self._xvfb_display = None
                 self.headless_active = False
+            except AttributeError:
+                pass
+            except Exception:
+                pass
+        if (
+            hasattr(sb_config, "_virtual_display")
+            and sb_config._virtual_display
+            and hasattr(sb_config._virtual_display, "stop")
+            and (
+                not hasattr(sb_config, "reuse_session")
+                or (
+                    hasattr(sb_config, "reuse_session")
+                    and not sb_config.reuse_session
+                )
+            )
+        ):
+            # CDP Mode may launch a 2nd Xvfb virtual display
+            try:
+                sb_config._virtual_display.stop()
+                sb_config._virtual_display = None
+                sb_config.headless_active = False
             except AttributeError:
                 pass
             except Exception:

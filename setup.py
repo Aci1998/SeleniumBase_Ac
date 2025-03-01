@@ -34,7 +34,7 @@ if sys.argv[-1] == "publish":
             print("\nERROR! Publishing to PyPI requires Python>=3.9")
             sys.exit()
         print("\n*** Checking code health with flake8:\n")
-        os.system("python -m pip install 'flake8==7.1.1'")
+        os.system("python -m pip install 'flake8==7.1.2'")
         flake8_status = os.system("flake8 --exclude=recordings,temp")
         if flake8_status != 0:
             print("\nERROR! Fix flake8 issues before publishing to PyPI!\n")
@@ -147,46 +147,52 @@ setup(
     ],
     python_requires=">=3.8",
     install_requires=[
-        'pip>=24.3.1',
+        'pip>=25.0.1',
         'packaging>=24.2',
         'setuptools~=70.2;python_version<"3.10"',  # Newer ones had issues
-        'setuptools>=75.6.0;python_version>="3.10"',
+        'setuptools>=75.8.2;python_version>="3.10"',
         'wheel>=0.45.1',
-        'attrs>=24.2.0',
-        "certifi>=2024.8.30",
+        'attrs>=25.1.0',
+        "certifi>=2025.1.31",
         "exceptiongroup>=1.2.2",
         'websockets~=13.1;python_version<"3.9"',
-        'websockets>=14.1;python_version>="3.9"',
-        'filelock>=3.16.1',
+        'websockets>=15.0;python_version>="3.9"',
+        'filelock~=3.16.1;python_version<"3.9"',
+        'filelock>=3.17.0;python_version>="3.9"',
         'fasteners>=0.19',
         "mycdp>=1.1.0",
-        "pynose>=1.5.3",
+        "pynose>=1.5.4",
         'platformdirs>=4.3.6',
         'typing-extensions>=4.12.2',
-        "sbvirtualdisplay>=1.3.1",
+        "sbvirtualdisplay>=1.4.0",
+        'MarkupSafe==2.1.5;python_version<"3.9"',
+        'MarkupSafe>=3.0.2;python_version>="3.9"',
+        "Jinja2>=3.1.5",
         "six>=1.17.0",
         'parse>=1.20.2',
         'parse-type>=0.6.4',
         'colorama>=0.4.6',
         'pyyaml>=6.0.2',
-        'pygments>=2.18.0',
+        'pygments>=2.19.1',
         'pyreadline3>=3.5.3;platform_system=="Windows"',
         "tabcompleter>=1.4.0",
         "pdbp>=1.6.1",
         "idna==3.10",
         'chardet==5.2.0',
-        'charset-normalizer==3.4.0',
+        'charset-normalizer==3.4.1',
         'urllib3>=1.26.20,<2;python_version<"3.10"',
-        'urllib3>=1.26.20,<2.3.0;python_version>="3.10"',
+        'urllib3>=1.26.20,<2.4.0;python_version>="3.10"',
         'requests==2.32.3',
         'sniffio==1.3.1',
         'h11==0.14.0',
         'outcome==1.3.0.post0',
-        'trio==0.27.0',
-        'trio-websocket==0.11.1',
+        'trio==0.27.0;python_version<"3.9"',
+        'trio==0.29.0;python_version>="3.9"',
+        'trio-websocket==0.12.2',
         'wsproto==1.2.0',
         'websocket-client==1.8.0',
-        'selenium==4.27.1',
+        'selenium==4.27.1;python_version<"3.9"',
+        'selenium==4.29.0;python_version>="3.9"',
         'cssselect==1.2.0',
         "sortedcontainers==2.4.0",
         'execnet==2.1.1',
@@ -202,7 +208,7 @@ setup(
         'parameterized==0.9.0',
         "behave==1.2.6",
         'soupsieve==2.6',
-        "beautifulsoup4==4.12.3",
+        "beautifulsoup4==4.13.3",
         'pyotp==2.9.0',
         'python-xlib==0.33;platform_system=="Linux"',
         'markdown-it-py==3.0.0',
@@ -222,7 +228,7 @@ setup(
         # Usage: coverage run -m pytest; coverage html; coverage report
         "coverage": [
             'coverage>=7.6.1;python_version<"3.9"',
-            'coverage>=7.6.9;python_version>="3.9"',
+            'coverage>=7.6.12;python_version>="3.9"',
             'pytest-cov>=5.0.0;python_version<"3.9"',
             'pytest-cov>=6.0.0;python_version>="3.9"',
         ],
@@ -230,7 +236,7 @@ setup(
         # Usage: flake8
         "flake8": [
             'flake8==5.0.4;python_version<"3.9"',
-            'flake8==7.1.1;python_version>="3.9"',
+            'flake8==7.1.2;python_version>="3.9"',
             "mccabe==0.7.0",
             'pyflakes==2.5.0;python_version<"3.9"',
             'pyflakes==3.2.0;python_version>="3.9"',
@@ -253,7 +259,7 @@ setup(
         "pdfminer": [
             'pdfminer.six==20240706',
             'cryptography==39.0.2;python_version<"3.9"',
-            'cryptography==44.0.0;python_version>="3.9"',
+            'cryptography==44.0.1;python_version>="3.9"',
             'cffi==1.17.1',
             "pycparser==2.22",
         ],
@@ -261,7 +267,7 @@ setup(
         # (An optional library for image-processing.)
         "pillow": [
             'Pillow>=10.4.0;python_version<"3.9"',
-            'Pillow>=11.0.0;python_version>="3.9"',
+            'Pillow>=11.1.0;python_version>="3.9"',
         ],
         # pip install -e .[pip-system-certs]
         # (If you see [SSL: CERTIFICATE_VERIFY_FAILED], then get this.)
@@ -277,7 +283,7 @@ setup(
         ],
         # pip install -e .[psutil]
         "psutil": [
-            "psutil==6.0.0",
+            "psutil==7.0.0",
         ],
         # pip install -e .[pyautogui]
         "pyautogui": [

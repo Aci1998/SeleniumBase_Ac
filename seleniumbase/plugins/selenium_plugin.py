@@ -145,6 +145,20 @@ class SeleniumBrowser(Plugin):
             help="""Shortcut for --browser=safari""",
         )
         parser.addoption(
+            "--cft",
+            action="store_true",
+            dest="use_cft",
+            default=False,
+            help="""Shortcut for using `Chrome for Testing`""",
+        )
+        parser.addoption(
+            "--chs",
+            action="store_true",
+            dest="use_chs",
+            default=False,
+            help="""Shortcut for using `Chrome-Headless-Shell`""",
+        )
+        parser.addoption(
             "--cap_file",
             "--cap-file",
             action="store",
@@ -397,6 +411,7 @@ class SeleniumBrowser(Plugin):
         parser.addoption(
             "--binary_location",
             "--binary-location",
+            "--bl",
             action="store",
             dest="binary_location",
             default=None,
@@ -1202,6 +1217,18 @@ class SeleniumBrowser(Plugin):
         test.test.extension_dir = self.options.extension_dir
         test.test.disable_features = self.options.disable_features
         test.test.binary_location = self.options.binary_location
+        if self.options.use_cft and not test.test.binary_location:
+            test.test.binary_location = "cft"
+        elif self.options.use_chs and not test.test.binary_location:
+            test.test.binary_location = "chs"
+        if (
+            test.test.binary_location
+            and test.test.binary_location.lower() == "chs"
+            and test.test.browser == "chrome"
+        ):
+            test.test.headless = True
+            test.test.headless1 = False
+            test.test.headless2 = False
         test.test.driver_version = self.options.driver_version
         test.test.page_load_strategy = self.options.page_load_strategy
         test.test.chromium_arg = self.options.chromium_arg
@@ -1282,6 +1309,7 @@ class SeleniumBrowser(Plugin):
         test.test.dashboard = False
         test.test._multithreaded = False
         test.test._reuse_session = False
+        sb_config.recorder_mode = test.test.recorder_mode
         sb_config.no_screenshot = test.test.no_screenshot_after_test
         if test.test.servername != "localhost":
             # Using Selenium Grid
