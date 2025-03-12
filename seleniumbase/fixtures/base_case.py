@@ -3896,6 +3896,9 @@ class BaseCase(unittest.TestCase):
 
     def open_new_window(self, switch_to=True):
         """Opens a new browser tab/window and switches to it by default."""
+        if self.__is_cdp_swap_needed():
+            self.cdp.open_new_tab(switch_to=switch_to)
+            return
         self.wait_for_ready_state_complete()
         if switch_to:
             try:
@@ -3918,6 +3921,9 @@ class BaseCase(unittest.TestCase):
             timeout = settings.SMALL_TIMEOUT
         if self.timeout_multiplier and timeout == settings.SMALL_TIMEOUT:
             timeout = self.__get_new_timeout(timeout)
+        if self.__is_cdp_swap_needed() and not isinstance(window, str):
+            self.cdp.switch_to_tab(window)
+            return
         page_actions.switch_to_window(self.driver, window, timeout)
 
     def switch_to_default_window(self):
@@ -8064,10 +8070,6 @@ class BaseCase(unittest.TestCase):
                     else:
                         found = False
                         message = entry["message"]
-                        if message.count(" - Failed to load resource") == 1:
-                            message = message.split(
-                                " - Failed to load resource"
-                            )[0]
                         for substring in exclude:
                             substring = str(substring)
                             if (
@@ -8085,7 +8087,30 @@ class BaseCase(unittest.TestCase):
                 u_c_t_e = " Uncaught TypeError: "
                 if f_t_l_r in errors[n]["message"]:
                     url = errors[n]["message"].split(f_t_l_r)[0]
-                    errors[n] = {"Error 404 (broken link)": url}
+                    if "status of 400" in errors[n]["message"]:
+                        errors[n] = {"Error 400 (Bad Request)": url}
+                    elif "status of 401" in errors[n]["message"]:
+                        errors[n] = {"Error 401 (Unauthorized)": url}
+                    elif "status of 402" in errors[n]["message"]:
+                        errors[n] = {"Error 402 (Payment Required)": url}
+                    elif "status of 403" in errors[n]["message"]:
+                        errors[n] = {"Error 403 (Forbidden)": url}
+                    elif "status of 404" in errors[n]["message"]:
+                        errors[n] = {"Error 404 (Not Found)": url}
+                    elif "status of 405" in errors[n]["message"]:
+                        errors[n] = {"Error 405 (Method Not Allowed)": url}
+                    elif "status of 406" in errors[n]["message"]:
+                        errors[n] = {"Error 406 (Not Acceptable)": url}
+                    elif "status of 407" in errors[n]["message"]:
+                        errors[n] = {"Error 407 (Proxy Auth Required)": url}
+                    elif "status of 408" in errors[n]["message"]:
+                        errors[n] = {"Error 408 (Request Timeout)": url}
+                    elif "status of 409" in errors[n]["message"]:
+                        errors[n] = {"Error 409 (Conflict)": url}
+                    elif "status of 410" in errors[n]["message"]:
+                        errors[n] = {"Error 410 (Gone)": url}
+                    else:
+                        errors[n] = {"Failed to load resource": url}
                 elif u_c_s_e in errors[n]["message"]:
                     url = errors[n]["message"].split(u_c_s_e)[0]
                     error = errors[n]["message"].split(u_c_s_e)[1]
@@ -10336,7 +10361,7 @@ class BaseCase(unittest.TestCase):
             timeout = self.__get_new_timeout(timeout)
         selector, by = self.__recalculate_selector(selector, by)
         if self.__is_cdp_swap_needed():
-            return self.cdp.wait_for_text(
+            return self.cdp.wait_for_text_not_visible(
                 text, selector=selector, timeout=timeout
             )
         return page_actions.wait_for_text_not_visible(
