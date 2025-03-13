@@ -5,15 +5,16 @@ pipeline {
         stage('准备环境') {
             steps {
                 echo '准备测试环境...'
-                // 确保使用正确的 Python 版本
-                sh 'python --version'
+                // 使用 python3 命令代替 python
+                sh 'which python3 || echo "Python3 not found"'
+                sh 'python3 --version || echo "Python3 version command failed"'
                 
                 // 创建并激活虚拟环境
                 sh '''
-                    python -m venv venv
+                    python3 -m venv venv || echo "Creating venv failed"
                     . venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
+                    pip3 install --upgrade pip
+                    pip3 install -r requirements.txt
                 '''
             }
         }
@@ -25,7 +26,7 @@ pipeline {
                 sh '''
                     . venv/bin/activate
                     cd examples
-                    pytest --alluredir=../allure-results
+                    python3 -m pytest --alluredir=../allure-results
                 '''
             }
         }
