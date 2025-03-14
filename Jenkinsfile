@@ -1,73 +1,61 @@
 pipeline {
     agent any
-    
     stages {
-        stage('准备环境') {
+        stage('Build') {
             steps {
-                echo '准备测试环境...'
-                // 使用 python3 命令代替 python
-                sh 'which python3 || echo "Python3 not found"'
-                sh 'python3 --version || echo "Python3 version command failed"'
-                
-                // 创建并激活虚拟环境
-                sh '''
-                    python3 -m venv venv || echo "Creating venv failed"
-                    . venv/bin/activate
-                    pip3 install --upgrade pip
-                    pip3 install -r requirements.txt
-                '''
+                // 安装测试依赖
+                sh 'pip3 install pytest pytest-html seleniumbase'
             }
         }
-        
-        stage('运行测试') {
+        stage('Test') {
             steps {
-                echo '执行自动化测试...'
-                // 激活虚拟环境并运行测试
-                sh '''
-                    . venv/bin/activate
-                    cd examples
-                    python3 -m pytest --alluredir=../allure-results
-                '''
+                // 执行测试并生成报告
+                sh 'mkdir -p reports' // 确保 reports 目录存在
+                sh 'python3 -m pytest examples/test_suite.py --html=reports/report.html --self-contained-html --verbose'
             }
         }
-        
-        stage('生成报告') {
+        stage('Publish Reports') {
             steps {
-                echo '生成 Allure 报告...'
-                // 生成 Allure 报告
-                allure([
-                    includeProperties: false,
-                    jdk: '',
-                    properties: [],
-                    reportBuildPolicy: 'ALWAYS',
-                    results: [[path: 'allure-results']]
-                ])
+                // 归档 HTML 报告
+                archiveArtifacts artifacts: 'reports/*.html', fingerprint: true, allowEmptyArchive: false
+                // 如果有 JUnit XML 报告，可启用以下步骤（当前无 XML，注释掉）
+                // junit 'reports/*.xml'
             }
         }
     }
-    
     post {
         always {
-            echo '清理环境...'
-            // 清理工作区
-            cleanWs()
-        }
-        success {
-            script {
-                currentBuild.description = "✅ 测试通过"
-            }
-        }
-        failure {
-            script {
-                currentBuild.description = "❌ 测试失败"
-            }
+            // 发布 HTML 报告到 Jenkins 界面
+            publishHTML target: [
+                reportName: 'Test Results',    // 报告名称
+                reportDir: 'reports',          // 报告目录
+                reportFiles: 'report.html',    // 报告文件
+                keepAll: true,                 // 保留所有历史报告
+                allowMissing: false,           // 报告不存在时失败
+                alwaysLinkToLastBuild: true    // 始终链接到最新构建
+            ]
+
+            // 发送邮件通知
+            emailext (
+                subject: "Jenkins Build ${currentBuild.fullDisplayName}",
+                body: """\
+                    Build: ${currentBuild.fullDisplayName}
+                    Status: ${currentBuild.currentResult}
+
+                    Check the test report here:
+                    ${env.BUILD_URL}htmlreports/Test_20Results/report.html
+
+                    Console output:
+                    ${env.BUILD_URL}console
+
+                    Best Regards,
+                    Jenkins
+                """,
+                to: 'imacaiy@outlook.com',
+                replyTo: 'noreply@jenkins.io',
+                attachmentsPattern: 'reports/report.html', // 附加报告文件
+                mimeType: 'text/html'                     // 支持 HTML 格式邮件
+            )
         }
     }
-    
-    options {
-        // 设置构建超时时间
-        timeout(time: 1, unit: 'HOURS')
-        // 保留最近的构建历史
-        buildDiscarder(logRotator(numToKeepStr: '10'))
-    }
-} 
+}
