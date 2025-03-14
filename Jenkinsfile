@@ -1,73 +1,68 @@
 pipeline {
     agent any
+    
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    
     stages {
-        stage('Checkout') {
+        stage('准备环境') {
             steps {
-                // 拉取代码，确保 examples/test_suite.py 存在
+                // 拉取代码
                 git url: 'https://github.com/Aci1998/SeleniumBase_Ac.git', branch: 'master'
-            }
-        }
-        stage('Build') {
-            steps {
+                
+                // 创建虚拟环境并安装依赖
                 sh '''
-                    # 创建并激活虚拟环境
                     python3 -m venv venv
                     . venv/bin/activate
-
-                    # 安装 requirements.txt 中的依赖（若存在）
-                    if [ -f requirements.txt ]; then
-                        pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
-                    else
-                        pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple pytest pytest-html seleniumbase
-                    fi
+                    pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip
+                    pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt || \
+                    pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple pytest pytest-html seleniumbase
                 '''
             }
         }
-        stage('Test') {
+        
+        stage('执行测试') {
             steps {
+                // 创建报告目录并运行测试
                 sh '''
-                    # 确保在 $WORKSPACE 下操作（默认已是）
                     mkdir -p reports
-
-                    # 激活虚拟环境并运行测试
                     . venv/bin/activate
-                    python3 -m pytest ./examples/test_suite.py --html=reports/report.html --self-contained-html --verbose
+                    python3 -m pytest examples/test_suite.py --html=reports/report.html --self-contained-html -v
                 '''
-            }
-        }
-        stage('Publish Reports') {
-            steps {
-                archiveArtifacts artifacts: 'reports/*.html', fingerprint: true, allowEmptyArchive: false
+                
+                // 归档测试报告
+                archiveArtifacts artifacts: 'reports/*.html', fingerprint: true
+                publishHTML target: [
+                    reportName: '测试报告',
+                    reportDir: 'reports',
+                    reportFiles: 'report.html',
+                    keepAll: true,
+                    alwaysLinkToLastBuild: true
+                ]
             }
         }
     }
+    
     post {
         always {
-            publishHTML target: [
-                reportName: 'Test Results',
-                reportDir: 'reports',
-                reportFiles: 'report.html',
-                keepAll: true,
-                allowMissing: false,
-                alwaysLinkToLastBuild: true
-            ]
+            // 发送邮件通知
             emailext (
-                subject: "Jenkins Build ${currentBuild.fullDisplayName}",
-                body: """\
-                    Build: ${currentBuild.fullDisplayName}
-                    Status: ${currentBuild.currentResult}
-                    Check the test report here:
-                    ${env.BUILD_URL}htmlreports/Test_20Results/report.html
-                    Console output:
-                    ${env.BUILD_URL}console
-                    Best Regards,
-                    Jenkins
+                subject: "测试结果: ${currentBuild.fullDisplayName} - ${currentBuild.currentResult}",
+                body: """
+                    <p>构建: ${currentBuild.fullDisplayName}</p>
+                    <p>状态: ${currentBuild.currentResult}</p>
+                    <p><a href="${env.BUILD_URL}htmlreports/测试报告/report.html">查看测试报告</a></p>
+                    <p><a href="${env.BUILD_URL}console">查看控制台输出</a></p>
                 """,
                 to: 'imacaiy@outlook.com',
                 replyTo: 'imacaiy@outlook.com',
-                attachmentsPattern: 'reports/report.html',
                 mimeType: 'text/html'
             )
+            
+            // 清理工作区
+            cleanWs()
         }
     }
 }
