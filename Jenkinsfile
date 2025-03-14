@@ -31,7 +31,7 @@ pipeline {
 
                     # 激活虚拟环境并运行测试
                     . venv/bin/activate
-                    python3 -m pytest examples/test_suite.py --html=reports/report.html --self-contained-html --verbose
+                    python3 -m pytest ./examples/test_suite.py --html=reports/report.html --self-contained-html --verbose
                 '''
             }
         }
