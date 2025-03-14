@@ -318,12 +318,12 @@ class EdgePresentationClass(BaseCase):
         self.add_slide(
             "<p>What are some disadvantages of using <b>raw</b> Selenium "
             "without extra libraries or frameworks?</p><hr /><br />\n"
-            "<mark>No HTML reports, dashboards, screenshots...</mark><br />"
+            "<mark>No HTML Report, dashboards, screenshots...</mark><br />"
             "<p>A test framework can provide those!</p><br />",
         )
         self.add_slide(
             "<h6>Raw Selenium disadvantages, continued...</h6><hr />"
-            "<h6>No HTML reports, dashboards, screenshots...</h6>\n"
+            "<h6>No HTML Report, dashboards, screenshots...</h6>\n"
             "<mark>A test framework can provide those!</mark>",
             image="https://seleniumbase.io/cdn/img/dash_report.png",
         )
@@ -365,7 +365,7 @@ class EdgePresentationClass(BaseCase):
             "<ul>\n"
             "<li>Auto-collect tests to run.</li>\n"
             "<li>Use markers for organizing tests.</li>\n"
-            "<li>Generate test reports.</li>\n"
+            "<li>Generate test Report.</li>\n"
             "<li>Provide test assertions.</li>\n"
             "<li>Multithread your tests.</li>\n"
             "<li>Use a large number of existing plugins.</li>\n"

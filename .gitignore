@@ -46,7 +46,7 @@ nosetests.1
 pip-log.txt
 .swp
 
-# Unit test / coverage reports
+# Unit test / coverage Report
 .coverage
 .tox
 coverage.xml

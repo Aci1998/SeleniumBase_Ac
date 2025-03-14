@@ -1330,7 +1330,7 @@ def pytest_addoption(parser):
         default=False,
         help="""No screenshots saved unless tests directly ask it.
                 This changes default behavior where screenshots are
-                saved for test failures and pytest-html reports.""",
+                saved for test failures and pytest-html Report.""",
     )
     parser.addoption(
         "--visual_baseline",
@@ -2200,7 +2200,7 @@ def _perform_pytest_unconfigure_(config):
         log_helper.archive_logs_if_set(
             constants.Logs.LATEST + "/", sb_config.archive_logs
         )
-        if os.path.exists("./assets/"):  # Used by pytest-html reports
+        if os.path.exists("./assets/"):  # Used by pytest-html Report
             with suppress(Exception):
                 shared_utils.make_dir_files_writable("./assets/")
     log_helper.clear_empty_logs()

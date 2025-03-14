@@ -275,7 +275,7 @@ def main():
     data.append("geckodriver.log")
     data.append("ghostdriver.log")
     data.append("pytestdebug.log")
-    data.append("reports/*.xml")
+    data.append("Report/*.xml")
     data.append("latest_report")
     data.append("report_archives")
     data.append("archived_reports")

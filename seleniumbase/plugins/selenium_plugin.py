@@ -990,7 +990,7 @@ class SeleniumBrowser(Plugin):
             default=False,
             help="""No screenshots saved unless tests directly ask it.
                     This changes default behavior where screenshots are
-                    saved for test failures and pytest-html reports.""",
+                    saved for test failures and pytest-html Report.""",
         )
         parser.addoption(
             "--visual_baseline",

@@ -12,7 +12,7 @@
     One big advantage to running tests with Pytest is that most of this
     is done for you automatically, with the option to update any of the
     parameters through command-line parsing. Pytest also provides you
-    with other plugins, such as ones for generating test reports,
+    with other plugins, such as ones for generating test Report,
     handling multithreading, and parametrized tests. Depending on your
     specific needs, you may need to call SeleniumBase commands without
     using Pytest, and this example shows you one way of doing that.

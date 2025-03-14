@@ -322,7 +322,7 @@ class Connection(metaclass=CantTouchThis):
 
     async def wait(self, t: Union[int, float] = None):
         """
-        Waits until the event listener reports idle
+        Waits until the event listener Report idle
         (no new events received in certain timespan).
         When `t` is provided, ensures waiting for `t` seconds, no matter what.
         :param t:

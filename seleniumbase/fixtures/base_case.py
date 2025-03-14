@@ -15078,7 +15078,7 @@ class BaseCase(unittest.TestCase):
         sb_config._last_page_screenshot = None
         sb_config._last_page_screenshot_png = None
 
-        # Indictate to pytest reports that SeleniumBase is being used
+        # Indictate to pytest Report that SeleniumBase is being used
         sb_config._sbase_detected = True
         sb_config._only_unittest = False
 

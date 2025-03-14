@@ -152,12 +152,12 @@ class MyTestClass(BaseCase):
             "<h4>What are some disadvantages of using <b>raw</b> Selenium "
             "without additional libraries or frameworks?</h4><hr />"
             "<h4><mark><br />\n"
-            "No HTML reports, dashboards, results, screenshots..."
+            "No HTML Report, dashboards, results, screenshots..."
             "</mark><br /><br />A test framework can provide those!<br />",
         )
         self.add_slide(
             "<h5>Raw Selenium disadvantages, continued...<hr />\n"
-            "No HTML reports, dashboards, results, screenshots...<div />"
+            "No HTML Report, dashboards, results, screenshots...<div />"
             "<mark>A test framework can provide those!</mark></h5>",
             image="https://seleniumbase.io/cdn/img/dash_report.png",
         )
@@ -214,7 +214,7 @@ class MyTestClass(BaseCase):
             "<ul>\n"
             "<li>Auto-collect tests to run.</li>\n"
             "<li>Use markers for organizing tests.</li>\n"
-            "<li>Generate test reports.</li>\n"
+            "<li>Generate test Report.</li>\n"
             "<li>Provide test assertions.</li>\n"
             "<li>Multithread your tests.</li>\n"
             "<li>Use a large number of existing plugins.</li>\n"
