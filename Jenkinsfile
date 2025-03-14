@@ -13,7 +13,7 @@ pipeline {
         stage('Test') {
             steps {
                 sh 'mkdir -p reports'
-                sh '. venv/bin/activate && python3 -m pytest examples/test_suite.py --html=reports/report.html --self-contained-html --verbose'
+                sh '. venv/bin/activate && python3 -m pytest --html=reports/report.html --self-contained-html --verbose'
             }
         }
         stage('Publish Reports') {
@@ -37,13 +37,10 @@ pipeline {
                 body: """\
                     Build: ${currentBuild.fullDisplayName}
                     Status: ${currentBuild.currentResult}
-
                     Check the test report here:
                     ${env.BUILD_URL}htmlreports/Test_20Results/report.html
-
                     Console output:
                     ${env.BUILD_URL}console
-
                     Best Regards,
                     Jenkins
                 """,
