@@ -3,23 +3,36 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                // 拉取代码
+                // 拉取代码，确保 examples/test_suite.py 存在
                 git url: 'https://github.com/Aci1998/SeleniumBase_Ac.git', branch: 'master'
             }
         }
         stage('Build') {
             steps {
                 sh '''
+                    # 创建并激活虚拟环境
                     python3 -m venv venv
                     . venv/bin/activate
-                    pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple pytest pytest-html seleniumbase
+
+                    # 安装 requirements.txt 中的依赖（若存在）
+                    if [ -f requirements.txt ]; then
+                        pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+                    else
+                        pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple pytest pytest-html seleniumbase
+                    fi
                 '''
             }
         }
         stage('Test') {
             steps {
-                sh 'mkdir -p reports'
-                sh '. venv/bin/activate && python3 -m pytest examples/test_suite.py --html=reports/report.html --self-contained-html --verbose'
+                sh '''
+                    # 确保在 $WORKSPACE 下操作（默认已是）
+                    mkdir -p reports
+
+                    # 激活虚拟环境并运行测试
+                    . venv/bin/activate
+                    python3 -m pytest examples/test_suite.py --html=reports/report.html --self-contained-html --verbose
+                '''
             }
         }
         stage('Publish Reports') {
