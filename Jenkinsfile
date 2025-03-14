@@ -1,6 +1,12 @@
 pipeline {
     agent any
     stages {
+        stage('Checkout') {
+            steps {
+                // 拉取代码
+                git url: 'https://github.com/Aci1998/SeleniumBase_Ac.git', branch: 'master'
+            }
+        }
         stage('Build') {
             steps {
                 sh '''
@@ -13,7 +19,7 @@ pipeline {
         stage('Test') {
             steps {
                 sh 'mkdir -p reports'
-                sh '. venv/bin/activate && python3 -m pytest --html=reports/report.html --self-contained-html --verbose'
+                sh '. venv/bin/activate && python3 -m pytest examples/test_suite.py --html=reports/report.html --self-contained-html --verbose'
             }
         }
         stage('Publish Reports') {
