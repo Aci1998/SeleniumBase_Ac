@@ -54,7 +54,7 @@ pipeline {
 
     post {
         always {
-            // 发送邮件通知
+            echo '发送邮件通知'
             emailext (
                 subject: "测试结果: ${currentBuild.fullDisplayName} - ${currentBuild.currentResult}",
                 body: """
@@ -67,8 +67,7 @@ pipeline {
                 replyTo: 'imacaiy@outlook.com',
                 mimeType: 'text/html'
             )
-
-            // 清理工作区
+            echo '清理工作区'
             cleanWs()
         }
     }
