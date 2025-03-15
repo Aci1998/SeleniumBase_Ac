@@ -35,7 +35,7 @@ pipeline {
                 echo '开始安装 pytest pytest-html seleniumbase'
                 sh 'pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple pytest pytest-html seleniumbase'
 
-                echo '*** SeleniumBase安装完成！ ***'
+                echo '*** SeleniumBase环境安装完成！ ***'
             }
         }
         
