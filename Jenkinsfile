@@ -1,10 +1,10 @@
 pipeline {
     agent any
 
-    options {
-        timeout(time: 30, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '30'))
-    }
+    //options {
+    //    timeout(time: 30, unit: 'MINUTES')
+    //    buildDiscarder(logRotator(numToKeepStr: '30'))
+    //}
 
     stages {
         stage('开始准备环境') {
