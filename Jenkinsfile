@@ -53,30 +53,13 @@ pipeline {
             }
         }
 
-        stage('归档日志和报告') {
+        stage('归档测试报告') {
             steps {
-                echo '将日志和报告复制到 Nginx 目录'
+                echo '将报告复制到 Nginx 目录'
                 sh '''
                     mkdir -p /var/www/reports/${BUILD_NUMBER}
-                    cp -r latest_logs/ /var/www/reports/${BUILD_NUMBER}/latest_logs
                     cp reports/report.html /var/www/reports/${BUILD_NUMBER}/report.html
-                    cp dashboard.html /var/www/reports/${BUILD_NUMBER}/dashboard.html
                 '''
-                echo "当前构建号: ${BUILD_NUMBER}"
-            }
-        }
-
-        stage('发布测试报告') {
-            steps {
-                publishHTML(
-                    target: [
-                        reportName: '测试报告',
-                        reportDir: 'reports',
-                        reportFiles: 'report.html',
-                        keepAll: true,
-                        alwaysLinkToLastBuild: true
-                    ]
-                )
             }
         }
     }
@@ -89,8 +72,7 @@ pipeline {
                 body: """
                     <p>构建: ${currentBuild.fullDisplayName}</p>
                     <p>状态: ${currentBuild.currentResult}</p>
-                    <p><a href="http://your-domain.com/reports/${BUILD_NUMBER}/report.html">查看测试报告</a></p>
-                    <p><a href="http://your-domain.com/reports/${BUILD_NUMBER}/dashboard.html">查看仪表板</a></p>
+                    <p><a href="http://www.wiac.xyz/reports/${BUILD_NUMBER}/report.html">查看测试报告</a></p>
                     <p><a href="${env.BUILD_URL}console">查看控制台输出</a></p>
                 """,
                 to: 'imacaiy@outlook.com',
@@ -99,7 +81,7 @@ pipeline {
             )
 
             // 清理工作区
-            //cleanWs()
+            cleanWs()
         }
     }
 }
