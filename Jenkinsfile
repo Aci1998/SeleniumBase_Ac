@@ -1,10 +1,10 @@
 pipeline {
     agent any
 
-    //options {
-    //    timeout(time: 30, unit: 'MINUTES')
-    //    buildDiscarder(logRotator(numToKeepStr: '30'))
-    //}
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
 
     stages {
         stage('开始准备环境') {
@@ -39,37 +39,66 @@ pipeline {
         stage('开始执行测试') {
             steps {
                 echo '开始运行测试并生成报告'
-                sh 'python3 -m pytest examples/test_suite.py --dashboard --rs --headless --html=reports/report.html'
-                // --self-contained-html -v
+                sh '''
+                    mkdir -p reports
+                    . venv/bin/activate
+                    python3 -m pytest examples/test_suite.py \
+                        --dashboard \
+                        --rs \
+                        --headless \
+                        --html=reports/report.html \
+                        --self-contained-html \
+                        -v
+                '''
+            }
+        }
 
-                echo '查看报告是否生成'
-                sh 'ls reports'
-
-                echo '将报告复制到 Nginx 目录'
+        stage('归档日志和报告') {
+            steps {
+                echo '将日志和报告复制到 Nginx 目录'
                 sh '''
                     mkdir -p /var/www/reports/${BUILD_NUMBER}
+                    cp -r latest_logs/ /var/www/reports/${BUILD_NUMBER}/latest_logs
                     cp reports/report.html /var/www/reports/${BUILD_NUMBER}/report.html
+                    cp dashboard.html /var/www/reports/${BUILD_NUMBER}/dashboard.html
                 '''
+                echo "当前构建号: ${BUILD_NUMBER}"
+            }
+        }
+
+        stage('发布测试报告') {
+            steps {
+                publishHTML(
+                    target: [
+                        reportName: '测试报告',
+                        reportDir: 'reports',
+                        reportFiles: 'report.html',
+                        keepAll: true,
+                        alwaysLinkToLastBuild: true
+                    ]
+                )
             }
         }
     }
 
     post {
         always {
-            echo '发送邮件通知'
+            // 发送邮件通知
             emailext (
                 subject: "测试结果: ${currentBuild.fullDisplayName} - ${currentBuild.currentResult}",
                 body: """
                     <p>构建: ${currentBuild.fullDisplayName}</p>
                     <p>状态: ${currentBuild.currentResult}</p>
-                    <p><a href="${env.BUILD_URL}/reports/${BUILD_NUMBER}/report.html">查看测试报告</a></p>
+                    <p><a href="http://your-domain.com/reports/${BUILD_NUMBER}/report.html">查看测试报告</a></p>
+                    <p><a href="http://your-domain.com/reports/${BUILD_NUMBER}/dashboard.html">查看仪表板</a></p>
                     <p><a href="${env.BUILD_URL}console">查看控制台输出</a></p>
                 """,
                 to: 'imacaiy@outlook.com',
                 replyTo: 'imacaiy@outlook.com',
                 mimeType: 'text/html'
             )
-            //echo '清理工作区'
+
+            // 清理工作区
             //cleanWs()
         }
     }
