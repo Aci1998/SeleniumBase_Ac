@@ -60,6 +60,9 @@ pipeline {
                     mkdir -p /var/www/reports/${BUILD_NUMBER}
                     cp reports/report.html /var/www/reports/${BUILD_NUMBER}/report.html
                 '''
+
+                echo '构建计划是 ${BUILD_NUMBER}'
+
             }
         }
     }
