@@ -39,7 +39,11 @@ pipeline {
         stage('开始执行测试') {
             steps {
                 echo '开始运行测试并生成报告'
-                sh 'python3 -m pytest examples/test_suite.py --dashboard --rs --headless --html=reports/report.html --self-contained-html -v'
+                sh 'python3 -m pytest examples/test_suite.py --dashboard --rs --headless --html=reports/report.html'
+                // --self-contained-html -v
+
+                echo '查看报告是否生成'
+                sh 'ls reports'
 
                 echo '将报告复制到 Nginx 目录'
                 sh '''
