@@ -81,7 +81,7 @@ pipeline {
             )
 
             // 清理工作区
-            cleanWs()
+            //cleanWs()
         }
     }
 }
