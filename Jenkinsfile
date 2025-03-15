@@ -20,18 +20,22 @@ pipeline {
                 sh 'ls -l'
                 
                 echo '开始创建虚拟环境并安装依赖'
-                sh 'python3 -m venv venv  . venv/bin/activate'
+                    sh '''
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip install -r requirements.txt
+                       '''
 
                 echo '开始更新pip'
                 sh 'pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip'
 
-                echo '开始安装依赖'
-                sh 'pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt'
+                //echo '开始安装依赖'
+                //sh 'pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt'
 
                 echo '开始安装 pytest pytest-html seleniumbase'
                 sh 'pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple pytest pytest-html seleniumbase'
 
-                echo '*** SeleniumBase安装完成！ ***'
+                echo '*** SeleniumBase环境安装完成！ ***'
             }
         }
         
