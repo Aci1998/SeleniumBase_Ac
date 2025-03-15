@@ -67,8 +67,8 @@ pipeline {
                 replyTo: 'imacaiy@outlook.com',
                 mimeType: 'text/html'
             )
-            echo '清理工作区'
-            cleanWs()
+            // echo '清理工作区'
+            // cleanWs()
         }
     }
 }
