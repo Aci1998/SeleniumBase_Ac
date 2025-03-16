@@ -1,90 +1,74 @@
 pipeline {
     agent any
 
-    //options {
-    //    timeout(time: 30, unit: 'MINUTES')
-    //    buildDiscarder(logRotator(numToKeepStr: '30'))
-    //}
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
 
     stages {
-        stage('开始准备环境') {
+        stage('Checkout Code') {
             steps {
-                echo '开始拉取代码'
-                git url: 'https://github.com/Aci1998/SeleniumBase_Ac.git', branch: 'master'
-
-                echo '获取当前目录信息'
-                sh 'pwd'
-                echo "当前工作目录 (通过环境变量): ${env.WORKSPACE}"
-
-                echo '打印当前目录结构'
-                sh 'ls -l'
-
-                echo '开始创建虚拟环境并安装依赖'
-                sh '''
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    pip install -r requirements.txt
-                '''
-
-                echo '开始更新pip'
-                sh 'pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip'
-
-                echo '开始安装 pytest pytest-html seleniumbase'
-                sh 'pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple pytest pytest-html seleniumbase'
-
-                echo '*** SeleniumBase环境安装完成！ ***'
+                script {
+                    echo '清空工作区（可选）'
+                    deleteDir()
+                }
             }
         }
 
-        stage('开始执行测试') {
+        stage('Run Tests') {
             steps {
-                echo '开始运行测试并生成报告'
-                sh '''
-                    mkdir -p reports
-                    . venv/bin/activate
-                    python3 -m pytest examples/test_suite.py \
-                        --dashboard \
-                        --rs \
-                        --headless \
-                        --html=reports/report.html \
-                        --self-contained-html \
-                        -v
-                '''
+                script {
+                    echo '赋予脚本执行权限'
+                    sh 'chmod +x ${WORKSPACE}/run_tests.sh'
+
+                    echo '执行测试脚本'
+                    sh '''
+                        ${WORKSPACE}/run_tests.sh
+                    '''
+                }
             }
         }
 
-        stage('归档测试报告') {
+        stage('Publish Report') {
             steps {
-                echo '将报告复制到 Nginx 目录'
-                sh '''
-                    mkdir -p /var/www/reports/${BUILD_NUMBER}
-                    cp reports/report.html /var/www/reports/${BUILD_NUMBER}/report.html
-                '''
+                script {
+                    echo '获取时间戳（假设脚本中导出 TIMESTAMP 变量）'
+                    def TIMESTAMP = sh(
+                        script: 'date +%Y%m%d%H%M%S',
+                        returnStdout: true
+                    ).trim()
 
-                echo '构建计划是 ${BUILD_NUMBER}'
+                    echo '发布 HTML 报告到 Jenkins 界面'
+                    publishHTML(
+                        target: [
+                            reportDir: '/var/www/reports/${TIMESTAMP}',
+                            reportFiles: 'report.html',
+                            reportName: 'HTML Report'
+                        ]
+                    )
 
+                    echo '输出外部访问链接'
+                    echo "外部访问链接: http://www.wiac.xyz/reports/${TIMESTAMP}/report.html"
+                }
             }
         }
     }
 
     post {
         always {
-            // 发送邮件通知
+            echo '发送邮件通知（使用 Jenkins 邮件插件）'
             emailext (
-                subject: "测试结果: ${currentBuild.fullDisplayName} - ${currentBuild.currentResult}",
-                body: """
-                    <p>构建: ${currentBuild.fullDisplayName}</p>
+                subject: '测试报告生成通知 - ${JOB_NAME} - Build #${BUILD_NUMBER}',
+                body: '''
+                    <p>构建号: ${BUILD_NUMBER}</p>
                     <p>状态: ${currentBuild.currentResult}</p>
-                    <p><a href="http://www.wiac.xyz/reports/${BUILD_NUMBER}/report.html">查看测试报告</a></p>
-                    <p><a href="${env.BUILD_URL}console">查看控制台输出</a></p>
-                """,
+                    <p>Jenkins 报告: <a href="${BUILD_URL}HTML_Report/">查看报告</a></p>
+                    <p>外部访问链接: <a href="http://www.wiac.xyz/reports/${TIMESTAMP}/report.html">Nginx 报告链接</a></p>
+                ''',
                 to: 'imacaiy@outlook.com',
-                replyTo: 'imacaiy@outlook.com',
                 mimeType: 'text/html'
             )
-
-            // 清理工作区
-            //cleanWs()
         }
     }
 }

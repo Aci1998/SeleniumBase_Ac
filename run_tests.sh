@@ -51,7 +51,7 @@ echo "测试完成！报告已发布到 $REPORT_DIR"
 echo "访问链接: http://www.wiac.xyz/reports/$TIMESTAMP/report.html"
 
 # 安装邮件工具
-sudo yum install mailx -y
+yum install mailx -y
 
 # 发送邮件
 EMAIL="imacaiy@outlook.com"
