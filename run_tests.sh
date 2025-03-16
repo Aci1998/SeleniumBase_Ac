@@ -48,3 +48,16 @@ cp -r latest_logs/ "$REPORT_DIR/latest_logs" || { echo "复制日志失败"; exi
 cp dashboard.html "$REPORT_DIR/dashboard.html" || { echo "复制仪表板失败"; exit 1; }
 
 echo "测试完成！报告已发布到 $REPORT_DIR"
+echo "访问链接: http://www.wiac.xyz/reports/$TIMESTAMP/report.html"
+
+# 安装邮件工具
+sudo yum install mailx -y
+
+# 发送邮件
+EMAIL="your-email@example.com"
+SUBJECT="测试报告生成通知"
+BODY="测试完成！报告已发布到 $REPORT_DIR\n访问链接: http://www.wiac.xyz/reports/$TIMESTAMP/report.html"
+echo -e "$BODY" | mail -s "$SUBJECT" "$EMAIL"
+
+echo "测试完成！报告已发布到 $REPORT_DIR"
+echo "访问链接已发送到 $EMAIL"
