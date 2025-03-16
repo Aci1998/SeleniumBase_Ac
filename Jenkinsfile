@@ -14,7 +14,10 @@ pipeline {
                         $class: 'GitSCM',
                         branches: [[name: '*/master']],
                         extensions: [],
-                        userRemoteConfigs: [[url: 'https://github.com/Aci1998/SeleniumBase_Ac.git']]
+                        userRemoteConfigs: [[
+                            url: 'https://github.com/Aci1998/SeleniumBase_Ac.git',
+                            credentialsId: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKZrTo4rmz6wKmzbeTrRhsAilHlaXF0GCKCwRZORJssM'
+                        ]]
                     ])
 
                     echo '验证文件是否存在'
