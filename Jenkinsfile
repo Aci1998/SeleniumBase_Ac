@@ -5,20 +5,25 @@ pipeline {
         timeout(time: 30, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '30'))
     }
-    stages{
+
+    stages {
         stage('Checkout Code') {
             steps {
                 script {
                     echo '清空工作区并拉取代码'
-                    checkout([
-                        $class: 'GitSCM',
-                        branches: [[name: '*/master']],
-                        extensions: [],
-                        userRemoteConfigs: [[
-                            url: 'https://github.com/Aci1998/SeleniumBase_Ac.git',
-                            credentialsId: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKZrTo4rmz6wKmzbeTrRhsAilHlaXF0GCKCwRZORJssM'
-                        ]]
-                    ])
+                    git(
+                        url: 'https://github.com/Aci1998/SeleniumBase_Ac.git',
+                        credentialsId: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKZrTo4rmz6wKmzbeTrRhsAilHlaXF0GCKCwRZORJssM',
+                        branch: 'master',
+                        extensions: [
+                            [$class: 'CloneOption',
+                             depth: 1,
+                             noTags: true,
+                             shallow: true,
+                             timeout: 30],
+                            [$class: 'GitLFSPull']
+                        ]
+                    )
 
                     echo '验证文件是否存在'
                     sh 'ls -l ${WORKSPACE}/run_tests.sh'
@@ -77,5 +82,5 @@ pipeline {
                 mimeType: 'text/html'
             )
         }
-   }
+    }
 }
