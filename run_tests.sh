@@ -54,7 +54,7 @@ echo "访问链接: http://www.wiac.xyz/reports/$TIMESTAMP/report.html"
 sudo yum install mailx -y
 
 # 发送邮件
-EMAIL="your-email@example.com"
+EMAIL="imacaiy@outlook.com"
 SUBJECT="测试报告生成通知"
 BODY="测试完成！报告已发布到 $REPORT_DIR\n访问链接: http://www.wiac.xyz/reports/$TIMESTAMP/report.html"
 echo -e "$BODY" | mail -s "$SUBJECT" "$EMAIL"
