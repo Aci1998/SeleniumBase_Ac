@@ -6,12 +6,19 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '30'))
     }
 
-    stages {
         stage('Checkout Code') {
             steps {
                 script {
-                    echo '清空工作区（可选）'
-                    deleteDir()
+                    echo '清空工作区并拉取代码'
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: '*/master']],
+                        extensions: [],
+                        userRemoteConfigs: [[url: 'https://github.com/Aci1998/SeleniumBase_Ac.git']]
+                    ])
+
+                    echo '验证文件是否存在'
+                    sh 'ls -l ${WORKSPACE}/run_tests.sh'
                 }
             }
         }
@@ -19,11 +26,9 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    echo '赋予脚本执行权限'
-                    sh 'chmod +x ${WORKSPACE}/run_tests.sh'
-
-                    echo '执行测试脚本'
+                    echo '赋予执行权限并运行脚本'
                     sh '''
+                        chmod +x ${WORKSPACE}/run_tests.sh
                         ${WORKSPACE}/run_tests.sh
                     '''
                 }
@@ -57,18 +62,17 @@ pipeline {
 
     post {
         always {
-            echo '发送邮件通知（使用 Jenkins 邮件插件）'
             emailext (
-                subject: '测试报告生成通知 - ${JOB_NAME} - Build #${BUILD_NUMBER}',
-                body: '''
-                    <p>构建号: ${BUILD_NUMBER}</p>
+                subject: "测试报告生成通知 - ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                body: """
+                    <p>构建号: ${env.BUILD_NUMBER}</p>
                     <p>状态: ${currentBuild.currentResult}</p>
-                    <p>Jenkins 报告: <a href="${BUILD_URL}HTML_Report/">查看报告</a></p>
-                    <p>外部访问链接: <a href="http://www.wiac.xyz/reports/${TIMESTAMP}/report.html">Nginx 报告链接</a></p>
-                ''',
+                    <p>Jenkins 报告: <a href="${env.BUILD_URL}HTML_Report/">查看报告</a></p>
+                    <p>外部访问链接: <a href="http://www.wiac.xyz/reports/${env.TIMESTAMP}/report.html">Nginx 报告链接</a></p>
+                """,
                 to: 'imacaiy@outlook.com',
                 mimeType: 'text/html'
             )
         }
     }
-}
+//}
