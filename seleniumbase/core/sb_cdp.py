@@ -1227,15 +1227,23 @@ class CDPMethods():
         if not timeout:
             timeout = settings.SMALL_TIMEOUT
         selector = self.__convert_to_css_if_xpath(selector)
-        self.select(selector, timeout=timeout)
+        element = self.select(selector, timeout=timeout)
         self.__add_light_pause()
-        coordinates = self.loop.run_until_complete(
-            self.page.js_dumps(
-                """document.querySelector"""
-                """('%s').getBoundingClientRect()"""
-                % js_utils.escape_quotes_if_needed(re.escape(selector))
+        coordinates = None
+        if ":contains(" in selector:
+            position = element.get_position()
+            x = position.x
+            y = position.y
+            width = position.width
+            height = position.height
+            coordinates = {"x": x, "y": y, "width": width, "height": height}
+        else:
+            coordinates = self.loop.run_until_complete(
+                self.page.js_dumps(
+                    """document.querySelector('%s').getBoundingClientRect()"""
+                    % js_utils.escape_quotes_if_needed(re.escape(selector))
+                )
             )
-        )
         return coordinates
 
     def get_element_size(self, selector, timeout=None):
@@ -1614,6 +1622,8 @@ class CDPMethods():
             pyautogui.dragTo(x2, y2, button="left", duration=timeframe)
 
     def gui_drag_drop_points(self, x1, y1, x2, y2, timeframe=0.35):
+        """Use PyAutoGUI to drag-and-drop from one point to another.
+        Can simulate click-and-hold when using the same point twice."""
         gui_lock = fasteners.InterProcessLock(
             constants.MultiBrowser.PYAUTOGUILOCK
         )
@@ -1653,6 +1663,8 @@ class CDPMethods():
         self.loop.run_until_complete(self.page.wait())
 
     def gui_drag_and_drop(self, drag_selector, drop_selector, timeframe=0.35):
+        """Use PyAutoGUI to drag-and-drop from one selector to another.
+        Can simulate click-and-hold when using the same selector twice."""
         self.__slow_mode_pause_if_set()
         self.bring_active_window_to_front()
         x1, y1 = self.get_gui_element_center(drag_selector)
@@ -1660,6 +1672,14 @@ class CDPMethods():
         x2, y2 = self.get_gui_element_center(drop_selector)
         self.__add_light_pause()
         self.gui_drag_drop_points(x1, y1, x2, y2, timeframe=timeframe)
+
+    def gui_click_and_hold(self, selector, timeframe=0.35):
+        """Use PyAutoGUI to click-and-hold a selector."""
+        self.__slow_mode_pause_if_set()
+        self.bring_active_window_to_front()
+        x, y = self.get_gui_element_center(selector)
+        self.__add_light_pause()
+        self.gui_drag_drop_points(x, y, x, y, timeframe=timeframe)
 
     def __gui_hover_x_y(self, x, y, timeframe=0.25, uc_lock=False):
         self.__install_pyautogui_if_missing()
@@ -2180,6 +2200,12 @@ class CDPMethods():
             )
         else:
             self.select(selector).save_screenshot(filename)
+
+    def print_to_pdf(self, name, folder=None):
+        filename = name
+        if folder:
+            filename = os.path.join(folder, name)
+        self.loop.run_until_complete(self.page.print_to_pdf(filename))
 
 
 class Chrome(CDPMethods):

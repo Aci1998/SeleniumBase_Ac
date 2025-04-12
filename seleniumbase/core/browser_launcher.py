@@ -1,4 +1,5 @@
 import fasteners
+import json
 import logging
 import os
 import platform
@@ -681,6 +682,7 @@ def uc_open_with_cdp_mode(driver, url=None):
     cdp.gui_click_element = CDPM.gui_click_element
     cdp.gui_drag_drop_points = CDPM.gui_drag_drop_points
     cdp.gui_drag_and_drop = CDPM.gui_drag_and_drop
+    cdp.gui_click_and_hold = CDPM.gui_click_and_hold
     cdp.gui_hover_x_y = CDPM.gui_hover_x_y
     cdp.gui_hover_element = CDPM.gui_hover_element
     cdp.gui_hover_and_click = CDPM.gui_hover_and_click
@@ -769,6 +771,7 @@ def uc_open_with_cdp_mode(driver, url=None):
     cdp.scroll_up = CDPM.scroll_up
     cdp.scroll_down = CDPM.scroll_down
     cdp.save_screenshot = CDPM.save_screenshot
+    cdp.print_to_pdf = CDPM.print_to_pdf
     cdp.page = page  # async world
     cdp.driver = driver.cdp_base  # async world
     cdp.tab = cdp.page  # shortcut (original)
@@ -1302,6 +1305,8 @@ def _uc_gui_click_captcha(
                     frame = "body > div#check > div:not([class])"
                 elif driver.is_element_present(".cf-turnstile-wrapper"):
                     frame = ".cf-turnstile-wrapper"
+                elif driver.is_element_present('[class="cf-turnstile"]'):
+                    frame = '[class="cf-turnstile"]'
                 elif driver.is_element_present(
                     '[data-callback="onCaptchaSuccess"]'
                 ):
@@ -1617,6 +1622,10 @@ def _uc_gui_handle_captcha_(driver, frame="iframe", ctype=None):
                     )
                 ):
                     frame = "body > div#check > div:not([class])"
+                elif driver.is_element_present(".cf-turnstile-wrapper"):
+                    frame = ".cf-turnstile-wrapper"
+                elif driver.is_element_present('[class="cf-turnstile"]'):
+                    frame = '[class="cf-turnstile"]'
                 else:
                     return
         else:
@@ -2119,6 +2128,15 @@ def _set_chrome_options(
         prefs["enable_do_not_track"] = True
     if external_pdf:
         prefs["plugins.always_open_pdf_externally"] = True
+        pdf_settings = {
+            "recentDestinations": [
+                {"id": "Save as PDF", "origin": "local", "account": ""}
+            ],
+            "selectedDestinationId": "Save as PDF",
+            "version": 2,
+        }
+        app_state = "printing.print_preview_sticky_settings.appState"
+        prefs[app_state] = json.dumps(pdf_settings)
     if proxy_string or proxy_pac_url:
         # Implementation of https://stackoverflow.com/q/65705775/7058266
         prefs["webrtc.ip_handling_policy"] = "disable_non_proxied_udp"
@@ -3293,7 +3311,6 @@ def get_remote_driver(
         from seleniumbase.core import capabilities_parser
         desired_caps = capabilities_parser.get_desired_capabilities(cap_file)
     if cap_string:
-        import json
         try:
             extra_caps = json.loads(str(cap_string))
         except Exception as e:

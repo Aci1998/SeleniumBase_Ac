@@ -34,7 +34,7 @@ if sys.argv[-1] == "publish":
             print("\nERROR! Publishing to PyPI requires Python>=3.9")
             sys.exit()
         print("\n*** Checking code health with flake8:\n")
-        os.system("python -m pip install 'flake8==7.1.2'")
+        os.system("python -m pip install 'flake8==7.2.0'")
         flake8_status = os.system("flake8 --exclude=recordings,temp")
         if flake8_status != 0:
             print("\nERROR! Fix flake8 issues before publishing to PyPI!\n")
@@ -150,20 +150,21 @@ setup(
         'pip>=25.0.1',
         'packaging>=24.2',
         'setuptools~=70.2;python_version<"3.10"',  # Newer ones had issues
-        'setuptools>=76.0.0;python_version>="3.10"',
+        'setuptools>=78.1.0;python_version>="3.10"',
         'wheel>=0.45.1',
-        'attrs>=25.1.0',
+        'attrs>=25.3.0',
         "certifi>=2025.1.31",
         "exceptiongroup>=1.2.2",
         'websockets~=13.1;python_version<"3.9"',
         'websockets>=15.0.1;python_version>="3.9"',
         'filelock~=3.16.1;python_version<"3.9"',
-        'filelock>=3.17.0;python_version>="3.9"',
+        'filelock>=3.18.0;python_version>="3.9"',
         'fasteners>=0.19',
         "mycdp>=1.1.1",
         "pynose>=1.5.4",
-        'platformdirs>=4.3.6',
-        'typing-extensions>=4.12.2',
+        'platformdirs>=4.3.6;python_version<"3.9"',
+        'platformdirs>=4.3.7;python_version>="3.9"',
+        'typing-extensions>=4.13.2',
         "sbvirtualdisplay>=1.4.0",
         'MarkupSafe==2.1.5;python_version<"3.9"',
         'MarkupSafe>=3.0.2;python_version>="3.9"',
@@ -176,12 +177,12 @@ setup(
         'pygments>=2.19.1',
         'pyreadline3>=3.5.3;platform_system=="Windows"',
         "tabcompleter>=1.4.0",
-        "pdbp>=1.6.1",
+        "pdbp>=1.7.0",
         "idna==3.10",
         'chardet==5.2.0',
         'charset-normalizer==3.4.1',
         'urllib3>=1.26.20,<2;python_version<"3.10"',
-        'urllib3>=1.26.20,<2.4.0;python_version>="3.10"',
+        'urllib3>=1.26.20,<2.5.0;python_version>="3.10"',
         'requests==2.32.3',
         'sniffio==1.3.1',
         'h11==0.14.0',
@@ -192,12 +193,12 @@ setup(
         'wsproto==1.2.0',
         'websocket-client==1.8.0',
         'selenium==4.27.1;python_version<"3.9"',
-        'selenium==4.29.0;python_version>="3.9"',
+        'selenium==4.31.0;python_version>="3.9"',
         'cssselect==1.2.0;python_version<"3.9"',
         'cssselect==1.3.0;python_version>="3.9"',
         "sortedcontainers==2.4.0",
         'execnet==2.1.1',
-        'iniconfig==2.0.0',
+        'iniconfig==2.1.0',
         'pluggy==1.5.0',
         'pytest==8.3.5',
         "pytest-html==4.0.2",  # Newer ones had issues
@@ -214,7 +215,7 @@ setup(
         'python-xlib==0.33;platform_system=="Linux"',
         'markdown-it-py==3.0.0',
         'mdurl==0.1.2',
-        'rich==13.9.4',
+        'rich>=14.0.0,<15',
     ],
     extras_require={
         # pip install -e .[allure]
@@ -229,20 +230,20 @@ setup(
         # Usage: coverage run -m pytest; coverage html; coverage report
         "coverage": [
             'coverage>=7.6.1;python_version<"3.9"',
-            'coverage>=7.6.12;python_version>="3.9"',
+            'coverage>=7.8.0;python_version>="3.9"',
             'pytest-cov>=5.0.0;python_version<"3.9"',
-            'pytest-cov>=6.0.0;python_version>="3.9"',
+            'pytest-cov>=6.1.1;python_version>="3.9"',
         ],
         # pip install -e .[flake8]
         # Usage: flake8
         "flake8": [
             'flake8==5.0.4;python_version<"3.9"',
-            'flake8==7.1.2;python_version>="3.9"',
+            'flake8==7.2.0;python_version>="3.9"',
             "mccabe==0.7.0",
             'pyflakes==2.5.0;python_version<"3.9"',
-            'pyflakes==3.2.0;python_version>="3.9"',
+            'pyflakes==3.3.2;python_version>="3.9"',
             'pycodestyle==2.9.1;python_version<"3.9"',
-            'pycodestyle==2.12.1;python_version>="3.9"',
+            'pycodestyle==2.13.0;python_version>="3.9"',
         ],
         # pip install -e .[ipdb]
         # (Not needed for debugging anymore. SeleniumBase now includes "pdbp".)
@@ -253,12 +254,14 @@ setup(
         # pip install -e .[mss]
         # (An optional library for tile_windows() in CDP Mode.)
         "mss": [
-            "mss==9.0.2",  # Next one drops Python 3.8/3.9
+            'mss==9.0.2;python_version<"3.9"',
+            'mss==10.0.0;python_version>="3.9"',
         ],
         # pip install -e .[pdfminer]
         # (An optional library for parsing PDF files.)
         "pdfminer": [
-            'pdfminer.six==20240706',
+            'pdfminer.six==20250324;python_version<"3.9"',
+            'pdfminer.six==20250327;python_version>="3.9"',
             'cryptography==39.0.2;python_version<"3.9"',
             'cryptography==44.0.2;python_version>="3.9"',
             'cffi==1.17.1',
@@ -268,7 +271,7 @@ setup(
         # (An optional library for image-processing.)
         "pillow": [
             'Pillow>=10.4.0;python_version<"3.9"',
-            'Pillow>=11.1.0;python_version>="3.9"',
+            'Pillow>=11.2.0;python_version>="3.9"',
         ],
         # pip install -e .[pip-system-certs]
         # (If you see [SSL: CERTIFICATE_VERIFY_FAILED], then get this.)

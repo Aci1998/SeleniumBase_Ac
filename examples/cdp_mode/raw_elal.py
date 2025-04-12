@@ -1,9 +1,32 @@
+import datetime
+import re
 from seleniumbase import SB
 
 with SB(uc=True, test=True, locale="en") as sb:
     url = "www.elal.com/flight-deals/en-us/flights-from-boston-to-tel-aviv"
     sb.activate_cdp_mode(url)
-    sb.sleep(2)
+    sb.sleep(3)
+    sb.cdp.click('label:contains("Departure date")')
+    sb.sleep(1)
+    today = datetime.date.today()
+    days_ahead = (4 - today.weekday() + 7) % 7
+    next_friday = today + datetime.timedelta(days=days_ahead)
+    formatted_date = next_friday.strftime("%m/%d/%Y")
+    sb.cdp.gui_click_element('input[aria-describedby*="date-input"]')
+    sb.sleep(1)
+    sb.cdp.gui_press_keys("\b" * 10 + formatted_date + "\n")
+    sb.sleep(1)
+    days_ahead = (4 - today.weekday() + 8) % 14
+    following_saturday = today + datetime.timedelta(days=days_ahead)
+    formatted_date = following_saturday.strftime("%m/%d/%Y")
+    sb.cdp.gui_click_element(
+        '[data-att="end-date-toggler"] [aria-describedby*="date-input"]'
+    )
+    sb.sleep(1)
+    sb.cdp.gui_press_keys("\b" * 10 + formatted_date + "\n")
+    sb.sleep(1)
+    sb.cdp.click('button[data-att="done"]')
+    sb.sleep(1)
     sb.cdp.click('button[data-att="search"]')
     sb.sleep(5)
     sb.cdp.click_if_visible("#onetrust-close-btn-container button")
@@ -21,10 +44,11 @@ with SB(uc=True, test=True, locale="en") as sb:
             print("*** Prices List: ***")
             for element in elements:
                 prices.append(element.text)
-            for price in sorted(prices):
+            prices.sort(key=lambda x: int(re.sub("[^0-9]", "", x)))
+            for price in prices:
                 print(price)
             print("*** Lowest Price: ***")
-            lowest_price = sorted(prices)[0]
+            lowest_price = prices[0]
             print(lowest_price)
             sb.cdp.scroll_down(12)
             sb.sleep(1)
