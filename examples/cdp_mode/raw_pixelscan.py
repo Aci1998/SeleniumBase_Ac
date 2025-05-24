@@ -1,13 +1,16 @@
 from seleniumbase import SB
 
 with SB(uc=True, incognito=True, test=True) as sb:
-    sb.activate_cdp_mode("https://pixelscan.net/")
+    url = "https://pixelscan.net/fingerprint-check"
+    sb.activate_cdp_mode(url)
     sb.sleep(3)
-    sb.remove_elements(".bg-bannerBg")  # Remove the top banner
-    sb.remove_elements("pxlscn-ad1")  # Remove the ad banner
+    sb.remove_elements(".bg-bannerBg")  # Remove top banner
+    sb.remove_elements("pxlscn-ad1")  # Remove an ad banner
+    sb.remove_elements("pxlscn-ad2")  # Remove an ad banner
     sb.remove_elements("jdiv")  # Remove chat widgets
     not_masking_text = "You are not masking your fingerprint"
-    sb.assert_text(not_masking_text, "pxlscn-fingerprint-masking")
+    fp_selector = "pxlscn-fingerprint-masking"
+    sb.assert_text(not_masking_text, fp_selector, timeout=15)
     no_automation_detected = "No automation framework detected"
     sb.assert_text(no_automation_detected, "pxlscn-bot-detection")
     consistent_selector = 'div.bg-consistentBg [alt="Good"]'

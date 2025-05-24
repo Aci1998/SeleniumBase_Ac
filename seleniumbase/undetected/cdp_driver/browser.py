@@ -46,9 +46,8 @@ def deconstruct_browser():
                     logger.debug(
                         "Problem removing data dir %s\n"
                         "Consider checking whether it's there "
-                        "and remove it by hand\nerror: %s",
-                        _.config.user_data_dir,
-                        e,
+                        "and remove it by hand\nerror: %s"
+                        % (_.config.user_data_dir, e)
                     )
                     break
                 time.sleep(0.15)
@@ -190,7 +189,7 @@ class Browser:
 
     sleep = wait
     """Alias for wait"""
-    def _handle_target_update(
+    async def _handle_target_update(
         self,
         event: Union[
             cdp.target.TargetInfoChanged,
@@ -224,21 +223,21 @@ class Browser:
                 current_tab.target = target_info
         elif isinstance(event, cdp.target.TargetCreated):
             target_info: cdp.target.TargetInfo = event.target_info
-            from .tab import Tab
-
-            new_target = Tab(
-                (
-                    f"ws://{self.config.host}:{self.config.port}"
-                    f"/devtools/{target_info.type_ or 'page'}"
-                    f"/{target_info.target_id}"
-                ),
+            websocket_url = (
+                f"ws://{self.config.host}:{self.config.port}"
+                f"/devtools/{target_info.type_ or 'page'}"
+                f"/{target_info.target_id}"
+            )
+            async with tab.Tab(
+                websocket_url=websocket_url,
                 target=target_info,
-                browser=self,
-            )
-            self.targets.append(new_target)
-            logger.debug(
-                "Target #%d created => %s", len(self.targets), new_target
-            )
+                browser=self
+            ) as new_target:
+                self.targets.append(new_target)
+                logger.debug(
+                    "Target #%d created => %s"
+                    % (len(self.targets), new_target)
+                )
         elif isinstance(event, cdp.target.TargetDestroyed):
             current_tab = next(
                 filter(
@@ -257,6 +256,7 @@ class Browser:
         url="about:blank",
         new_tab: bool = False,
         new_window: bool = False,
+        **kwargs,
     ) -> tab.Tab:
         """Top level get. Utilizes the first tab to retrieve given url.
         Convenience function known from selenium.
@@ -287,10 +287,63 @@ class Browser:
             connection: tab.Tab = next(
                 filter(lambda item: item.type_ == "page", self.targets)
             )
-            # Use the tab to navigate to new url
+            _cdp_timezone = None
+            _cdp_user_agent = ""
+            _cdp_locale = None
+            _cdp_platform = None
+            _cdp_geolocation = None
+            if (
+                hasattr(sb_config, "_cdp_timezone") and sb_config._cdp_timezone
+            ):
+                _cdp_timezone = sb_config._cdp_timezone
+            if (
+                hasattr(sb_config, "_cdp_user_agent")
+                and sb_config._cdp_user_agent
+            ):
+                _cdp_user_agent = sb_config._cdp_user_agent
             if hasattr(sb_config, "_cdp_locale") and sb_config._cdp_locale:
+                _cdp_locale = sb_config._cdp_locale
+            if hasattr(sb_config, "_cdp_platform") and sb_config._cdp_platform:
+                _cdp_platform = sb_config._cdp_platform
+            if (
+                hasattr(sb_config, "_cdp_geolocation")
+                and sb_config._cdp_geolocation
+            ):
+                _cdp_geolocation = sb_config._cdp_geolocation
+            if "timezone" in kwargs:
+                _cdp_timezone = kwargs["timezone"]
+            elif "tzone" in kwargs:
+                _cdp_timezone = kwargs["tzone"]
+            if "user_agent" in kwargs:
+                _cdp_user_agent = kwargs["user_agent"]
+            elif "agent" in kwargs:
+                _cdp_user_agent = kwargs["agent"]
+            if "locale" in kwargs:
+                _cdp_locale = kwargs["locale"]
+            elif "lang" in kwargs:
+                _cdp_locale = kwargs["lang"]
+            if "platform" in kwargs:
+                _cdp_platform = kwargs["platform"]
+            elif "plat" in kwargs:
+                _cdp_platform = kwargs["plat"]
+            if "geolocation" in kwargs:
+                _cdp_geolocation = kwargs["geolocation"]
+            elif "geoloc" in kwargs:
+                _cdp_geolocation = kwargs["geoloc"]
+            if _cdp_timezone:
                 await connection.send(cdp.page.navigate("about:blank"))
-                await connection.set_locale(sb_config._cdp_locale)
+                await connection.set_timezone(_cdp_timezone)
+            if _cdp_user_agent or _cdp_locale or _cdp_platform:
+                await connection.send(cdp.page.navigate("about:blank"))
+                await connection.set_user_agent(
+                    user_agent=_cdp_user_agent,
+                    accept_language=_cdp_locale,
+                    platform=_cdp_platform,
+                )
+            if _cdp_geolocation:
+                await connection.send(cdp.page.navigate("about:blank"))
+                await connection.set_geolocation(_cdp_geolocation)
+            # Use the tab to navigate to new url
             frame_id, loader_id, *_ = await connection.send(
                 cdp.page.navigate(url)
             )
@@ -323,8 +376,8 @@ class Browser:
             self.config.port = util.free_port()
         if not connect_existing:
             logger.debug(
-                "BROWSER EXECUTABLE PATH: %s",
-                self.config.browser_executable_path,
+                "BROWSER EXECUTABLE PATH: %s"
+                % self.config.browser_executable_path,
             )
             if not pathlib.Path(self.config.browser_executable_path).exists():
                 raise FileNotFoundError(
@@ -627,6 +680,9 @@ class Browser:
             self._process = None
             self._process_pid = None
 
+    def quit(self):
+        self.stop()
+
     def __await__(self):
         # return ( asyncio.sleep(0)).__await__()
         return self.update_targets().__await__()
@@ -729,10 +785,8 @@ class CookieJar:
         for cookie in cookies:
             for match in pattern.finditer(str(cookie.__dict__)):
                 logger.debug(
-                    "Saved cookie for matching pattern '%s' => (%s: %s)",
-                    pattern.pattern,
-                    cookie.name,
-                    cookie.value,
+                    "Saved cookie for matching pattern '%s' => (%s: %s)"
+                    % (pattern.pattern, cookie.name, cookie.value)
                 )
                 included_cookies.append(cookie)
                 break
@@ -769,10 +823,8 @@ class CookieJar:
             for match in pattern.finditer(str(cookie.__dict__)):
                 included_cookies.append(cookie)
                 logger.debug(
-                    "Loaded cookie for matching pattern '%s' => (%s: %s)",
-                    pattern.pattern,
-                    cookie.name,
-                    cookie.value,
+                    "Loaded cookie for matching pattern '%s' => (%s: %s)"
+                    % (pattern.pattern, cookie.name, cookie.value)
                 )
                 break
         await connection.send(cdp.network.set_cookies(included_cookies))

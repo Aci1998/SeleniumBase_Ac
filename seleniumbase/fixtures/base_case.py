@@ -162,6 +162,7 @@ class BaseCase(unittest.TestCase):
         self.__jqc_default_theme = None
         self.__jqc_default_color = None
         self.__jqc_default_width = None
+        self.__saved_id = None
         # Requires self._* instead of self.__* for external class use
         self._language = "English"
         self._presentation_slides = {}
@@ -3533,12 +3534,24 @@ class BaseCase(unittest.TestCase):
 
     def set_window_size(self, width, height):
         self.__check_scope()
+        if self.__is_cdp_swap_needed():
+            position = self.cdp.get_window_position()
+            x = position["x"]
+            y = position["y"]
+            self.cdp.set_window_rect(x, y, width, height)
+            return
         self._check_browser()
         self.driver.set_window_size(width, height)
         self.__demo_mode_pause_if_active(tiny=True)
 
     def set_window_position(self, x, y):
         self.__check_scope()
+        if self.__is_cdp_swap_needed():
+            size = self.cdp.get_window_size()
+            width = size["width"]
+            height = size["height"]
+            self.cdp.set_window_rect(x, y, width, height)
+            return
         self._check_browser()
         self.driver.set_window_position(x, y)
         self.__demo_mode_pause_if_active(tiny=True)
@@ -4869,7 +4882,7 @@ class BaseCase(unittest.TestCase):
         script = """document.designMode = 'off';"""
         self.execute_script(script)
 
-    def activate_cdp_mode(self, url=None):
+    def activate_cdp_mode(self, url=None, **kwargs):
         if hasattr(self.driver, "_is_using_uc") and self.driver._is_using_uc:
             if self.__is_cdp_swap_needed():
                 return  # CDP Mode is already active
@@ -4878,10 +4891,10 @@ class BaseCase(unittest.TestCase):
             current_url = self.get_current_url()
             if not current_url.startswith(("about", "data", "chrome")):
                 self.get_new_driver(undetectable=True)
-            self.driver.uc_open_with_cdp_mode(url)
+            self.driver.uc_open_with_cdp_mode(url, **kwargs)
         else:
             self.get_new_driver(undetectable=True)
-            self.driver.uc_open_with_cdp_mode(url)
+            self.driver.uc_open_with_cdp_mode(url, **kwargs)
         self.cdp = self.driver.cdp
 
     def activate_recorder(self):
@@ -7665,10 +7678,13 @@ class BaseCase(unittest.TestCase):
                     break
                 time.sleep(1)
         if not found and not os.path.exists(downloaded_file_path):
+            plural = "s"
+            if timeout == 1:
+                plural = ""
             message = (
                 "File {%s} was not found in the downloads folder {%s} "
-                "after %s seconds! (Or the download didn't complete!)"
-                % (file, df, timeout)
+                "after %s second%s! (Or the download didn't complete!)"
+                % (file, df, timeout, plural)
             )
             page_actions.timeout_exception("NoSuchFileException", message)
         if self.recorder_mode and self.__current_url_is_recordable():
@@ -7722,10 +7738,13 @@ class BaseCase(unittest.TestCase):
                     break
                 time.sleep(1)
         if not found:
+            plural = "s"
+            if timeout == 1:
+                plural = ""
             message = (
                 "Regex {%s} was not found in the downloads folder {%s} "
-                "after %s seconds! (Or the download didn't complete!)"
-                % (regex, df, timeout)
+                "after %s second%s! (Or the download didn't complete!)"
+                % (regex, df, timeout, plural)
             )
             page_actions.timeout_exception("NoSuchFileException", message)
         if self.demo_mode:
@@ -8249,7 +8268,10 @@ class BaseCase(unittest.TestCase):
         In CDP Mode, the CDP-Driver controls the web browser.
         The CDP-Driver can be connected while WebDriver isn't.
         """
-        return self.driver.is_connected()
+        if hasattr(self.driver, "is_connected"):
+            return self.driver.is_connected()
+        else:
+            return True
 
     def is_chromium(self):
         """Return True if the browser is Chrome or Edge."""
@@ -10022,12 +10044,14 @@ class BaseCase(unittest.TestCase):
         elif self.__is_cdp_swap_needed():
             self.cdp.assert_text(text, selector, timeout=timeout)
             return True
-        elif not self.is_connected():
-            self.connect()
         elif self.__is_shadow_selector(selector):
+            if hasattr(self, "connect") and not self.is_connected():
+                self.connect()
             self.__assert_shadow_text_visible(text, selector, timeout)
             return True
         else:
+            if hasattr(self, "connect") and not self.is_connected():
+                self.connect()
             self.wait_for_text_visible(text, selector, by=by, timeout=timeout)
             if self.demo_mode:
                 a_t = "ASSERT TEXT"
@@ -10161,9 +10185,13 @@ class BaseCase(unittest.TestCase):
                 if now_ms >= stop_ms:
                     break
                 time.sleep(0.2)
-        message = "Link text {%s} was not found after %s seconds!" % (
+        plural = "s"
+        if timeout == 1:
+            plural = ""
+        message = "Link text {%s} was not found after %s second%s!" % (
             link_text,
             timeout,
+            plural,
         )
         page_actions.timeout_exception("LinkTextNotFoundException", message)
 
@@ -10186,9 +10214,12 @@ class BaseCase(unittest.TestCase):
                 if now_ms >= stop_ms:
                     break
                 time.sleep(0.2)
+        plural = "s"
+        if timeout == 1:
+            plural = ""
         message = (
-            "Partial Link text {%s} was not found after %s seconds!"
-            "" % (link_text, timeout)
+            "Partial Link text {%s} was not found after %s second%s!"
+            "" % (link_text, timeout, plural)
         )
         page_actions.timeout_exception("LinkTextNotFoundException", message)
 
@@ -14396,9 +14427,12 @@ class BaseCase(unittest.TestCase):
                 if must_be_visible and is_present:
                     error = "not visible"
                     the_exception = "ElementNotVisibleException"
+                plural = "s"
+                if timeout == 1:
+                    plural = ""
                 msg = (
-                    "Shadow DOM Element {%s} was %s after %s seconds!"
-                    % (selector_chain, error, timeout)
+                    "Shadow DOM Element {%s} was %s after %s second%s!"
+                    % (selector_chain, error, timeout, plural)
                 )
                 page_actions.timeout_exception(the_exception, msg)
         return element
@@ -15676,19 +15710,24 @@ class BaseCase(unittest.TestCase):
             test_id = "%s.%s" % (file_name, scenario_name)
             return test_id
         elif hasattr(self, "is_context_manager") and self.is_context_manager:
+            if hasattr(self, "_manager_saved_id"):
+                self.__saved_id = self._manager_saved_id
+            if self.__saved_id:
+                return self.__saved_id
             filename = self.__class__.__module__.split(".")[-1] + ".py"
             methodname = self._testMethodName
             context_id = None
             if filename == "base_case.py" or methodname == "runTest":
                 import traceback
-                stack_base = traceback.format_stack()[0].split(", in ")[0]
-                test_base = stack_base.split(", in ")[0].split(os.sep)[-1]
+                stack_base = traceback.format_stack()[0].split(os.sep)[-1]
+                test_base = stack_base.split(", in ")[0]
                 if hasattr(self, "cm_filename") and self.cm_filename:
                     filename = self.cm_filename
                 else:
                     filename = test_base.split('"')[0]
                 methodname = ".line_" + test_base.split(", line ")[-1]
                 context_id = filename.split(".")[0] + methodname
+                self.__saved_id = context_id
                 return context_id
         test_id = "%s.%s.%s" % (
             self.__class__.__module__,

@@ -23,7 +23,7 @@ with SB(uc=True) as sb:  # Many args! Eg. SB(browser="edge")
 
 #########################################
 """
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 
 
 @contextmanager  # Usage: -> ``with SB() as sb:``
@@ -258,6 +258,7 @@ def SB(
     time_limit (float):  SECONDS (Safely fail tests that exceed the time limit)
     """
     import colorama
+    import gc
     import os
     import sys
     import time
@@ -1231,6 +1232,16 @@ def SB(
     sb.cap_file = sb_config.cap_file
     sb.cap_string = sb_config.cap_string
     sb._has_failure = False  # This may change
+
+    with suppress(Exception):
+        stack_base = traceback.format_stack()[0].split("with SB(")[0]
+        stack_base = stack_base.split(os.sep)[-1]
+        test_base = stack_base.split(", in ")[0]
+        filename = test_base.split('"')[0]
+        methodname = ".line_" + test_base.split(", line ")[-1]
+        context_id = filename.split(".")[0] + methodname
+        sb._manager_saved_id = context_id
+
     if hasattr(sb_config, "headless_active"):
         sb.headless_active = sb_config.headless_active
     else:
@@ -1241,7 +1252,8 @@ def SB(
         c1 = colorama.Fore.GREEN
         b1 = colorama.Style.BRIGHT
         cr = colorama.Style.RESET_ALL
-        stack_base = traceback.format_stack()[0].split(os.sep)[-1]
+        stack_base = traceback.format_stack()[0].split("with SB(")[0]
+        stack_base = stack_base.split(os.sep)[-1]
         test_name = stack_base.split(", in ")[0].replace('", line ', ":")
         test_name += ":SB"
         start_text = "=== {%s} starts ===" % test_name
@@ -1357,6 +1369,20 @@ def SB(
                     "%s%s%s%s%s"
                     % (c1, left_space, end_text, right_space, cr)
                 )
+        if undetectable and hasattr(sb, "_drivers_browser_map"):
+            import asyncio
+            for driver in sb._drivers_browser_map.keys():
+                if (
+                    hasattr(driver, "cdp")
+                    and driver.cdp
+                    and hasattr(driver.cdp, "loop")
+                ):
+                    asyncio.set_event_loop(driver.cdp.loop)
+                    tasks = [tab.aclose() for tab in driver.cdp.get_tabs()]
+                    tasks.append(driver.cdp.driver.connection.aclose())
+                    driver.cdp.loop.run_until_complete(asyncio.gather(*tasks))
+                    driver.cdp.loop.close()
+        gc.collect()
     if test and test_name and not test_passed and raise_test_failure:
         raise exception
     elif (

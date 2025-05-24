@@ -404,7 +404,7 @@ def uc_special_open_if_cf(
                 special = True
                 if status_str == "403" or status_str == "429":
                     time.sleep(0.06)  # Forbidden / Blocked! (Wait first!)
-        if special:
+        if special and not hasattr(driver, "cdp_base"):
             time.sleep(0.05)
             with driver:
                 driver.execute_script('window.open("%s","_blank");' % url)
@@ -472,9 +472,12 @@ def uc_open_with_tab(driver, url):
         time.sleep(0.3)
         return
     if (url.startswith("http:") or url.startswith("https:")):
-        with driver:
-            driver.execute_script('window.open("%s","_blank");' % url)
-            driver.close()
+        if not hasattr(driver, "cdp_base"):
+            with driver:
+                driver.execute_script('window.open("%s","_blank");' % url)
+                driver.close()
+        else:
+            driver.cdp.open(url)
         page_actions.switch_to_window(driver, driver.window_handles[-1], 2)
     else:
         driver.default_get(url)  # The original one
@@ -492,9 +495,12 @@ def uc_open_with_reconnect(driver, url, reconnect_time=None):
         reconnect_time = constants.UC.RECONNECT_TIME
     if (url.startswith("http:") or url.startswith("https:")):
         script = 'window.open("%s","_blank");' % url
-        driver.execute_script(script)
-        time.sleep(0.05)
-        driver.close()
+        if not hasattr(driver, "cdp_base"):
+            driver.execute_script(script)
+            time.sleep(0.05)
+            driver.close()
+        else:
+            driver.cdp.open(url)
         if reconnect_time == "disconnect":
             driver.disconnect()
             time.sleep(0.008)
@@ -515,7 +521,7 @@ def uc_open_with_reconnect(driver, url, reconnect_time=None):
     return None
 
 
-def uc_open_with_cdp_mode(driver, url=None):
+def uc_open_with_cdp_mode(driver, url=None, **kwargs):
     import asyncio
     from seleniumbase.undetected.cdp_driver import cdp_util
 
@@ -543,15 +549,35 @@ def uc_open_with_cdp_mode(driver, url=None):
     if url_protocol not in ["about", "data", "chrome"]:
         safe_url = False
 
+    if (
+        hasattr(driver, "_is_using_cdp")
+        and driver._is_using_cdp
+        and hasattr(driver, "cdp")
+        and driver.cdp
+        and hasattr(driver.cdp, "loop")
+    ):
+        # CDP Mode was already initialized
+        driver.cdp.open(url, **kwargs)
+        if not safe_url:
+            time.sleep(constants.UC.CDP_MODE_OPEN_WAIT)
+            if IS_WINDOWS:
+                time.sleep(constants.UC.EXTRA_WINDOWS_WAIT)
+        else:
+            time.sleep(0.012)
+        return
+
     headless = False
     headed = None
     xvfb = None
+    binary_location = None
     if hasattr(sb_config, "headless"):
         headless = sb_config.headless
     if hasattr(sb_config, "headed"):
         headed = sb_config.headed
     if hasattr(sb_config, "xvfb"):
         xvfb = sb_config.xvfb
+    if hasattr(sb_config, "binary_location"):
+        binary_location = sb_config.binary_location
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -562,6 +588,7 @@ def uc_open_with_cdp_mode(driver, url=None):
             headless=headless,
             headed=headed,
             xvfb=xvfb,
+            browser_executable_path=binary_location,
         )
     )
     loop.run_until_complete(driver.cdp_base.wait(0))
@@ -603,7 +630,9 @@ def uc_open_with_cdp_mode(driver, url=None):
                 loop.run_until_complete(page_tab.activate())
 
     loop.run_until_complete(driver.cdp_base.update_targets())
-    page = loop.run_until_complete(driver.cdp_base.get(url))
+    page = loop.run_until_complete(
+        driver.cdp_base.get(url, **kwargs)
+    )
     with gui_lock:
         with suppress(Exception):
             shared_utils.make_writable(constants.MultiBrowser.PYAUTOGUILOCK)
@@ -788,8 +817,8 @@ def uc_open_with_cdp_mode(driver, url=None):
     driver._is_using_cdp = True
 
 
-def uc_activate_cdp_mode(driver, url=None):
-    uc_open_with_cdp_mode(driver, url=url)
+def uc_activate_cdp_mode(driver, url=None, **kwargs):
+    uc_open_with_cdp_mode(driver, url=url, **kwargs)
 
 
 def uc_open_with_disconnect(driver, url, timeout=None):
@@ -1898,6 +1927,7 @@ def _add_chrome_proxy_extension(
     proxy_string,
     proxy_user,
     proxy_pass,
+    proxy_scheme,
     proxy_bypass_list=None,
     zip_it=True,
     multi_proxy=False,
@@ -1916,7 +1946,11 @@ def _add_chrome_proxy_extension(
             proxy_zip_lock = fasteners.InterProcessLock(PROXY_ZIP_LOCK)
             with proxy_zip_lock:
                 proxy_helper.create_proxy_ext(
-                    proxy_string, proxy_user, proxy_pass, bypass_list
+                    proxy_string,
+                    proxy_user,
+                    proxy_pass,
+                    proxy_scheme,
+                    bypass_list,
                 )
                 proxy_zip = proxy_helper.PROXY_ZIP_PATH
                 chrome_options.add_extension(proxy_zip)
@@ -1927,6 +1961,7 @@ def _add_chrome_proxy_extension(
                     proxy_string,
                     proxy_user,
                     proxy_pass,
+                    proxy_scheme,
                     bypass_list,
                     zip_it=False,
                 )
@@ -1945,7 +1980,11 @@ def _add_chrome_proxy_extension(
                     _set_proxy_filenames()
                 if not os.path.exists(proxy_helper.PROXY_ZIP_PATH):
                     proxy_helper.create_proxy_ext(
-                        proxy_string, proxy_user, proxy_pass, bypass_list
+                        proxy_string,
+                        proxy_user,
+                        proxy_pass,
+                        proxy_scheme,
+                        bypass_list,
                     )
                 proxy_zip = proxy_helper.PROXY_ZIP_PATH
                 chrome_options.add_extension(proxy_zip)
@@ -1961,6 +2000,7 @@ def _add_chrome_proxy_extension(
                         proxy_string,
                         proxy_user,
                         proxy_pass,
+                        proxy_scheme,
                         bypass_list,
                         zip_it=False,
                     )
@@ -2035,6 +2075,7 @@ def _set_chrome_options(
     proxy_auth,
     proxy_user,
     proxy_pass,
+    proxy_scheme,
     proxy_bypass_list,
     proxy_pac_url,
     multi_proxy,
@@ -2339,6 +2380,7 @@ def _set_chrome_options(
                 proxy_string,
                 proxy_user,
                 proxy_pass,
+                proxy_scheme,
                 proxy_bypass_list,
                 zip_it,
                 multi_proxy,
@@ -2358,6 +2400,7 @@ def _set_chrome_options(
                 None,
                 proxy_user,
                 proxy_pass,
+                proxy_scheme,
                 proxy_bypass_list,
                 zip_it,
                 multi_proxy,
@@ -2969,6 +3012,7 @@ def get_driver(
     proxy_auth = False
     proxy_user = None
     proxy_pass = None
+    proxy_scheme = "http"
     if proxy_string:
         username_and_password = None
         if "@" in proxy_string:
@@ -2992,7 +3036,9 @@ def get_driver(
                     "that has authentication! (If using a proxy server "
                     "without auth, Chrome, Edge, or Firefox may be used.)"
                 )
-        proxy_string = proxy_helper.validate_proxy_string(proxy_string)
+        proxy_string, proxy_scheme = proxy_helper.validate_proxy_string(
+            proxy_string, keep_scheme=True
+        )
         if proxy_string and proxy_user and proxy_pass:
             proxy_auth = True
     elif proxy_pac_url:
@@ -3081,6 +3127,7 @@ def get_driver(
             proxy_auth,
             proxy_user,
             proxy_pass,
+            proxy_scheme,
             proxy_bypass_list,
             proxy_pac_url,
             multi_proxy,
@@ -3141,6 +3188,7 @@ def get_driver(
             proxy_auth,
             proxy_user,
             proxy_pass,
+            proxy_scheme,
             proxy_bypass_list,
             proxy_pac_url,
             multi_proxy,
@@ -3201,6 +3249,7 @@ def get_remote_driver(
     proxy_auth,
     proxy_user,
     proxy_pass,
+    proxy_scheme,
     proxy_bypass_list,
     proxy_pac_url,
     multi_proxy,
@@ -3341,6 +3390,7 @@ def get_remote_driver(
             proxy_auth,
             proxy_user,
             proxy_pass,
+            proxy_scheme,
             proxy_bypass_list,
             proxy_pac_url,
             multi_proxy,
@@ -3517,6 +3567,7 @@ def get_remote_driver(
             proxy_auth,
             proxy_user,
             proxy_pass,
+            proxy_scheme,
             proxy_bypass_list,
             proxy_pac_url,
             multi_proxy,
@@ -3638,6 +3689,7 @@ def get_local_driver(
     proxy_auth,
     proxy_user,
     proxy_pass,
+    proxy_scheme,
     proxy_bypass_list,
     proxy_pac_url,
     multi_proxy,
@@ -4302,6 +4354,7 @@ def get_local_driver(
                     proxy_string,
                     proxy_user,
                     proxy_pass,
+                    proxy_scheme,
                     proxy_bypass_list,
                     zip_it=True,
                     multi_proxy=multi_proxy,
@@ -4318,6 +4371,7 @@ def get_local_driver(
                     None,
                     proxy_user,
                     proxy_pass,
+                    proxy_scheme,
                     proxy_bypass_list,
                     zip_it=True,
                     multi_proxy=multi_proxy,
@@ -4508,6 +4562,7 @@ def get_local_driver(
                 proxy_auth,
                 proxy_user,
                 proxy_pass,
+                proxy_scheme,
                 proxy_bypass_list,
                 proxy_pac_url,
                 multi_proxy,
@@ -5046,6 +5101,7 @@ def get_local_driver(
                                         None,  # proxy_auth
                                         None,  # proxy_user
                                         None,  # proxy_pass
+                                        None,  # proxy_scheme
                                         None,  # proxy_bypass_list
                                         None,  # proxy_pac_url
                                         None,  # multi_proxy
@@ -5299,6 +5355,7 @@ def get_local_driver(
                         None,  # proxy_auth
                         None,  # proxy_user
                         None,  # proxy_pass
+                        None,  # proxy_scheme
                         None,  # proxy_bypass_list
                         None,  # proxy_pac_url
                         None,  # multi_proxy

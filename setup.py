@@ -30,8 +30,10 @@ if sys.argv[-1] == "publish":
     confirm_text = ">>> Confirm release PUBLISH to PyPI? (yes/no): "
     reply = str(input_method(confirm_text)).lower().strip()
     if reply == "yes":
-        if sys.version_info < (3, 9):
-            print("\nERROR! Publishing to PyPI requires Python>=3.9")
+        if sys.version_info < (3, 10):
+            current_ver = ".".join(str(ver) for ver in sys.version_info[:3])
+            print("\nERROR! Publishing to PyPI requires Python>=3.10")
+            print("You are currently using Python %s\n" % current_ver)
             sys.exit()
         print("\n*** Checking code health with flake8:\n")
         os.system("python -m pip install 'flake8==7.2.0'")
@@ -147,23 +149,24 @@ setup(
     ],
     python_requires=">=3.8",
     install_requires=[
-        'pip>=25.0.1',
-        'packaging>=24.2',
+        'pip>=25.0.1;python_version<"3.9"',
+        'pip>=25.1.1;python_version>="3.9"',
+        'packaging>=25.0',
         'setuptools~=70.2;python_version<"3.10"',  # Newer ones had issues
-        'setuptools>=78.1.0;python_version>="3.10"',
+        'setuptools>=80.8.0;python_version>="3.10"',
         'wheel>=0.45.1',
         'attrs>=25.3.0',
-        "certifi>=2025.1.31",
-        "exceptiongroup>=1.2.2",
+        "certifi>=2025.4.26",
+        "exceptiongroup>=1.3.0",
         'websockets~=13.1;python_version<"3.9"',
         'websockets>=15.0.1;python_version>="3.9"',
         'filelock~=3.16.1;python_version<"3.9"',
         'filelock>=3.18.0;python_version>="3.9"',
         'fasteners>=0.19',
-        "mycdp>=1.1.1",
+        "mycdp>=1.2.0",
         "pynose>=1.5.4",
         'platformdirs>=4.3.6;python_version<"3.9"',
-        'platformdirs>=4.3.7;python_version>="3.9"',
+        'platformdirs>=4.3.8;python_version>="3.9"',
         'typing-extensions>=4.13.2',
         "sbvirtualdisplay>=1.4.0",
         'MarkupSafe==2.1.5;python_version<"3.9"',
@@ -180,37 +183,39 @@ setup(
         "pdbp>=1.7.0",
         "idna==3.10",
         'chardet==5.2.0',
-        'charset-normalizer==3.4.1',
+        'charset-normalizer>=3.4.2,<4',
         'urllib3>=1.26.20,<2;python_version<"3.10"',
         'urllib3>=1.26.20,<2.5.0;python_version>="3.10"',
         'requests==2.32.3',
         'sniffio==1.3.1',
-        'h11==0.14.0',
+        'h11==0.16.0',
         'outcome==1.3.0.post0',
         'trio==0.27.0;python_version<"3.9"',
-        'trio==0.29.0;python_version>="3.9"',
+        'trio==0.30.0;python_version>="3.9"',
         'trio-websocket==0.12.2',
         'wsproto==1.2.0',
         'websocket-client==1.8.0',
         'selenium==4.27.1;python_version<"3.9"',
-        'selenium==4.31.0;python_version>="3.9"',
+        'selenium==4.32.0;python_version>="3.9" and python_version<"3.10"',
+        'selenium==4.33.0;python_version>="3.10"',
         'cssselect==1.2.0;python_version<"3.9"',
         'cssselect==1.3.0;python_version>="3.9"',
         "sortedcontainers==2.4.0",
         'execnet==2.1.1',
         'iniconfig==2.1.0',
-        'pluggy==1.5.0',
+        'pluggy==1.5.0;python_version<"3.9"',
+        'pluggy==1.6.0;python_version>="3.9"',
         'pytest==8.3.5',
         "pytest-html==4.0.2",  # Newer ones had issues
         'pytest-metadata==3.1.1',
         "pytest-ordering==0.6",
         'pytest-rerunfailures==14.0;python_version<"3.9"',
-        'pytest-rerunfailures==15.0;python_version>="3.9"',
+        'pytest-rerunfailures==15.1;python_version>="3.9"',
         'pytest-xdist==3.6.1',
         'parameterized==0.9.0',
         "behave==1.2.6",
-        'soupsieve==2.6',
-        "beautifulsoup4==4.13.3",
+        'soupsieve==2.7',
+        "beautifulsoup4==4.13.4",
         'pyotp==2.9.0',
         'python-xlib==0.33;platform_system=="Linux"',
         'markdown-it-py==3.0.0',
@@ -230,7 +235,7 @@ setup(
         # Usage: coverage run -m pytest; coverage html; coverage report
         "coverage": [
             'coverage>=7.6.1;python_version<"3.9"',
-            'coverage>=7.8.0;python_version>="3.9"',
+            'coverage>=7.8.2;python_version>="3.9"',
             'pytest-cov>=5.0.0;python_version<"3.9"',
             'pytest-cov>=6.1.1;python_version>="3.9"',
         ],
@@ -261,9 +266,9 @@ setup(
         # (An optional library for parsing PDF files.)
         "pdfminer": [
             'pdfminer.six==20250324;python_version<"3.9"',
-            'pdfminer.six==20250327;python_version>="3.9"',
+            'pdfminer.six==20250506;python_version>="3.9"',
             'cryptography==39.0.2;python_version<"3.9"',
-            'cryptography==44.0.2;python_version>="3.9"',
+            'cryptography==45.0.2;python_version>="3.9"',
             'cffi==1.17.1',
             "pycparser==2.22",
         ],
@@ -271,7 +276,7 @@ setup(
         # (An optional library for image-processing.)
         "pillow": [
             'Pillow>=10.4.0;python_version<"3.9"',
-            'Pillow>=11.2.0;python_version>="3.9"',
+            'Pillow>=11.2.1;python_version>="3.9"',
         ],
         # pip install -e .[pip-system-certs]
         # (If you see [SSL: CERTIFICATE_VERIFY_FAILED], then get this.)

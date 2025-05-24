@@ -145,9 +145,14 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         debug_port = 9222
         special_port_free = False  # If the port isn't free, don't use 9222
         try:
-            res = requests.get("http://127.0.0.1:9222", timeout=1)
-            if res.status_code != 200:
-                raise Exception("The port is free! It will be used!")
+            with requests.Session() as session:
+                res = session.get(
+                    "http://127.0.0.1:9222",
+                    headers={"Connection": "close"},
+                    timeout=2,
+                )
+                if res.status_code != 200:
+                    raise Exception("The port is free! It will be used!")
         except Exception:
             # Use port 9222, which outputs to chrome://inspect/#devices
             special_port_free = True
@@ -397,7 +402,8 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
     def add_cdp_listener(self, event_name, callback):
         if (
-            self.reactor
+            hasattr(self, "reactor")
+            and self.reactor
             and self.reactor is not None
             and isinstance(self.reactor, Reactor)
         ):
@@ -406,7 +412,11 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         return False
 
     def clear_cdp_listeners(self):
-        if self.reactor and isinstance(self.reactor, Reactor):
+        if (
+            hasattr(self, "reactor")
+            and self.reactor
+            and isinstance(self.reactor, Reactor)
+        ):
             self.reactor.handlers.clear()
 
     def window_new(self, url=None):
@@ -462,9 +472,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         with suppress(Exception):
             for window_handle in self.window_handles:
                 self.switch_to.window(window_handle)
-                if self.current_url.startswith(
-                    "chrome-extension://"
-                ):
+                if self.current_url.startswith("chrome-extension://"):
                     # https://issues.chromium.org/issues/396611138
                     # (Remove the Linux conditional when resolved)
                     # (So that close() is always called)
@@ -515,9 +523,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         with suppress(Exception):
             for window_handle in self.window_handles:
                 self.switch_to.window(window_handle)
-                if self.current_url.startswith(
-                    "chrome-extension://"
-                ):
+                if self.current_url.startswith("chrome-extension://"):
                     # https://issues.chromium.org/issues/396611138
                     # (Remove the Linux conditional when resolved)
                     # (So that close() is always called)
@@ -559,10 +565,18 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             logger.debug(e, exc_info=True)
         except Exception:
             pass
+        with suppress(Exception):
+            self.stop_client()
+        with suppress(Exception):
+            if hasattr(self, "command_executor") and self.command_executor:
+                self.command_executor.close()
+
+        # Remove instance reference to allow garbage collection
+        Chrome._instances.discard(self)
+
         if hasattr(self, "service") and getattr(self.service, "process", None):
             logger.debug("Stopping webdriver service")
             with suppress(Exception):
-                self.stop_client()
                 try:
                     self.service.send_remote_shutdown_command()
                 except TypeError:
@@ -570,10 +584,16 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                 finally:
                     with suppress(Exception):
                         self.service._terminate_process()
-        with suppress(Exception):
-            if self.reactor and isinstance(self.reactor, Reactor):
-                logger.debug("Shutting down Reactor")
+        if (
+            hasattr(self, "reactor")
+            and self.reactor
+            and hasattr(self.reactor, "event")
+        ):
+            logger.debug("Shutting down Reactor")
+            with suppress(Exception):
                 self.reactor.event.set()
+                self.reactor.join(timeout=2)
+            self.reactor = None
         if (
             hasattr(self, "keep_user_data_dir")
             and hasattr(self, "user_data_dir")
